@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#082c3e">
+    <title>Fiji Pig Fishing</title>
+    <link rel="stylesheet" href="./css/style.css">
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="game-header">
+        <div>
+          <p class="eyebrow">A tiny aquarium adventure</p>
+          <h1>Fiji Pig Fishing</h1>
+        </div>
+        <div class="scoreboard" aria-live="polite">
+          <span>Fish <strong id="fish-count">0</strong></span>
+          <span>Score <strong id="score">0</strong></span>
+        </div>
+      </header>
+
+      <section class="game-frame" aria-label="Fishing game">
+        <canvas id="game-canvas" width="1000" height="640" aria-label="Aquarium fishing game">
+          Your browser does not support the canvas needed to play Fiji Pig Fishing.
+        </canvas>
+        <div class="game-overlay">
+          <div id="start-panel" class="start-panel">
+            <p class="eyebrow">Cast into the big blue</p>
+            <h2>Ready to fish?</h2>
+            <p>Move your mouse through the aquarium. When a fish bites, reel clockwise to bring it home.</p>
+            <button id="start-button" class="primary-button" type="button">Start fishing</button>
+          </div>
+          <button id="bite-button" class="bite-button" type="button" hidden>BITE NOW!</button>
+          <div id="status-label" class="status-label" aria-live="polite"></div>
+          <aside id="debug-panel" class="debug-panel" hidden aria-live="polite"></aside>
+          <p class="help-hint">Move lure · Hold the yellow handle and circle clockwise · <kbd>D</kbd> debug</p>
+        </div>
+      </section>
+      <p class="footer-note">Phase 1 · Gameplay prototype · No account or server required</p>
+    </main>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
