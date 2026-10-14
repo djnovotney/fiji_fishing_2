@@ -4,11 +4,13 @@ import { Game } from "../js/game.js";
 import { REEL, REEL_MAX_RPM, REEL_MIN_RPM, REEL_TARGET_RPM } from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
 
-test("the playable loop progresses from lure interest through a scored catch and reset", () => {
+test("the playable loop progresses from lure interest through a weighted catch and reset", () => {
   const game = new Game();
   game.start();
 
   const target = game.fish[0];
+  const targetWeightLb = target.weightLb;
+  assert.ok(targetWeightLb >= 3 && targetWeightLb <= 10);
   target.x = 510;
   target.y = 330;
   target.vx = 0;
@@ -21,8 +23,14 @@ test("the playable loop progresses from lure interest through a scored catch and
   assert.ok(Math.abs(game.lure.x - 500) < 1, "mouse movement positions the lure before casting");
   for (let i = 0; i < 20; i += 1) game.update(0.05);
   assert.equal(game.state, "IDLE", "fish must not detect a lure before the player casts");
+  const lurePositionAtCast = { x: game.lure.x, y: game.lure.y };
   assert.equal(game.castLure(500, 330), true);
   assert.equal(game.state, "CASTING");
+  assert.deepEqual(
+    { x: game.lure.x, y: game.lure.y },
+    lurePositionAtCast,
+    "casting keeps the lure at its selected position instead of snapping back to the rod",
+  );
   assert.equal(game.castLure(600, 330), false, "only one cast is allowed until the attempt resets");
 
   let elapsed = 0;
@@ -42,7 +50,7 @@ test("the playable loop progresses from lure interest through a scored catch and
     elapsed += 0.05;
   }
   assert.equal(game.fishCaught, 1);
-  assert.ok(game.score > 0);
+  assert.equal(game.totalWeightLb, targetWeightLb);
   assert.equal(game.state, "RESET");
 
   while (game.state !== "IDLE" && elapsed < 35) {
@@ -54,9 +62,9 @@ test("the playable loop progresses from lure interest through a scored catch and
 });
 
 test("the reel target and slow/fast thresholds match the requested RPM values", () => {
-  assert.equal(REEL_MIN_RPM, 50);
-  assert.equal(REEL_TARGET_RPM, 80);
-  assert.equal(REEL_MAX_RPM, 120);
+  assert.equal(REEL_MIN_RPM, 40);
+  assert.equal(REEL_TARGET_RPM, 60);
+  assert.equal(REEL_MAX_RPM, 80);
 });
 
 test("reel input measures clockwise movement and does not retrieve on counterclockwise movement", () => {
@@ -76,7 +84,7 @@ test("reel input measures clockwise movement and does not retrieve on counterclo
       startTime + sample * 10,
     );
   }
-  assert.ok(reel.targetRPM >= 75 && reel.targetRPM <= 85, "clockwise rotation should measure approximately 80 RPM");
+  assert.ok(reel.targetRPM >= 55 && reel.targetRPM <= 65, "clockwise rotation should measure approximately 60 RPM");
   assert.ok(reel.cumulativeRotation > 0);
 
   const clockwise = start + radiansPerSecond * 0.3;

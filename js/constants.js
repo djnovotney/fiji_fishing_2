@@ -10,7 +10,7 @@ export const TANK = Object.freeze({
 });
 
 export const PLATFORM_HEIGHT = 126;
-export const ROD_TIP = Object.freeze({ x: 230, y: 92 });
+export const ROD_TIP = Object.freeze({ x: 300, y: 48 });
 export const BUCKET = Object.freeze({ x: 287, y: 110 });
 export const REEL = Object.freeze({ x: 835, y: 489, handleRadius: 59, outerRadius: 77 });
 
@@ -20,6 +20,6 @@ export const LINE = Object.freeze({
   metersPerRevolution: 0.27,
 });
 
-export const REEL_MIN_RPM = 50;
-export const REEL_TARGET_RPM = 80;
-export const REEL_MAX_RPM = 120;
+export const REEL_MIN_RPM = 40;
+export const REEL_TARGET_RPM = 60;
+export const REEL_MAX_RPM = 80;

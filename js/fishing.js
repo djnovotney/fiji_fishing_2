@@ -113,7 +113,7 @@ export function updateFishing(game, dt) {
       0,
       100,
     );
-    if (game.tension < 20 || game.tension > 88 || rpm < REEL_MIN_RPM || rpm > REEL_MAX_RPM) {
+    if (game.tension < 20 || game.tension > 88 || rpm <= REEL_MIN_RPM || rpm >= REEL_MAX_RPM) {
       game.dangerTime += dt;
     } else {
       game.dangerTime = Math.max(0, game.dangerTime - dt * 0.8);
@@ -137,7 +137,7 @@ export function updateFishing(game, dt) {
     fish.x = game.landingStart.x + (287 - game.landingStart.x) * eased;
     fish.y = game.landingStart.y + (103 - game.landingStart.y) * eased;
     if (progress >= 1) {
-      game.score += Math.round(80 + fish.size * 45);
+      game.totalWeightLb += fish.weightLb;
       game.fishCaught += 1;
       finishAttempt(game, true);
     }

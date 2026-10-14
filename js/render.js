@@ -55,54 +55,70 @@ function drawPlatformAndPig(ctx) {
   ctx.fillRect(109, 118, 8, 10);
   ctx.fillRect(157, 118, 8, 10);
 
-  ctx.fillStyle = "#ee8d90";
-  ctx.beginPath();
-  ctx.ellipse(139, 67, 34, 29, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(111, 51, 10, 16, -0.35, 0, Math.PI * 2);
-  ctx.ellipse(164, 50, 10, 16, 0.35, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#faabb0";
-  ctx.beginPath();
-  ctx.ellipse(111, 52, 5, 10, -0.35, 0, Math.PI * 2);
-  ctx.ellipse(164, 51, 5, 10, 0.35, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#252633";
-  ctx.beginPath();
-  ctx.arc(128, 62, 3, 0, Math.PI * 2);
-  ctx.arc(151, 62, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#f8b1b0";
-  ctx.beginPath();
-  ctx.ellipse(140, 76, 19, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#a74e64";
-  ctx.beginPath();
-  ctx.ellipse(134, 76, 2.5, 4, 0, 0, Math.PI * 2);
-  ctx.ellipse(146, 76, 2.5, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#70384b";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(139, 67, 9, 0.2, 1.2);
-  ctx.stroke();
+  ctx.fillStyle = "#a84358";
+  ctx.fillRect(115, 49, 16, 26);
+  ctx.fillStyle = "#f59ba0";
+  ctx.fillRect(111, 45, 20, 25);
+  ctx.fillRect(145, 45, 20, 25);
+  ctx.fillStyle = "#d86f7e";
+  ctx.fillRect(115, 49, 12, 17);
+  ctx.fillRect(149, 49, 12, 17);
+  ctx.fillStyle = "#e77f8c";
+  ctx.fillRect(111, 61, 56, 36);
+  ctx.fillStyle = "#f7a2a4";
+  ctx.fillRect(117, 55, 45, 32);
+  ctx.fillRect(161, 67, 15, 21);
+  ctx.fillStyle = "#ffd0c5";
+  ctx.fillRect(166, 72, 10, 12);
+  ctx.fillStyle = "#5c3748";
+  ctx.fillRect(147, 63, 5, 7);
+  ctx.fillRect(159, 63, 5, 7);
+  ctx.fillStyle = "#b95068";
+  ctx.fillRect(169, 75, 3, 4);
+  ctx.fillRect(169, 80, 3, 4);
+  ctx.fillStyle = "#d86f7e";
+  ctx.fillRect(124, 87, 35, 14);
 
-  ctx.strokeStyle = "#273e45";
-  ctx.lineWidth = 11;
-  ctx.lineCap = "round";
+  ctx.strokeStyle = "#27343c";
+  ctx.lineWidth = 8;
+  ctx.lineCap = "butt";
   ctx.beginPath();
-  ctx.moveTo(158, 89);
-  ctx.lineTo(184, 101);
+  ctx.moveTo(158, 91);
+  ctx.lineTo(191, 79);
+  ctx.lineTo(235, 65);
+  ctx.lineTo(271, 54);
   ctx.lineTo(ROD_TIP.x, ROD_TIP.y);
   ctx.stroke();
-  ctx.strokeStyle = "#d5a35d";
+  ctx.strokeStyle = "#92734c";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(158, 89);
-  ctx.lineTo(184, 101);
+  ctx.moveTo(158, 91);
+  ctx.lineTo(191, 79);
+  ctx.lineTo(235, 65);
+  ctx.lineTo(271, 54);
   ctx.lineTo(ROD_TIP.x, ROD_TIP.y);
   ctx.stroke();
+  ctx.strokeStyle = "#d4c39a";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(158, 91);
+  ctx.lineTo(191, 79);
+  ctx.lineTo(235, 65);
+  ctx.lineTo(271, 54);
+  ctx.lineTo(ROD_TIP.x, ROD_TIP.y);
+  ctx.stroke();
+  for (const guide of [{ x: 193, y: 78 }, { x: 239, y: 64 }, { x: 273, y: 53 }, ROD_TIP]) {
+    ctx.strokeStyle = "#dce8e4";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(guide.x, guide.y);
+    ctx.lineTo(guide.x + 1, guide.y + 10);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#48525a";
+  ctx.fillRect(158, 88, 17, 7);
+  ctx.fillStyle = "#f1b639";
+  ctx.fillRect(155, 88, 5, 8);
 
   ctx.fillStyle = "#e4f2e7";
   ctx.font = "bold 13px Trebuchet MS";
@@ -110,29 +126,41 @@ function drawPlatformAndPig(ctx) {
 }
 
 function drawBucket(ctx, game) {
-  ctx.fillStyle = "#d99a48";
+  const metal = ctx.createLinearGradient(BUCKET.x - 29, 0, BUCKET.x + 29, 0);
+  metal.addColorStop(0, "#65747a");
+  metal.addColorStop(0.18, "#d2dcda");
+  metal.addColorStop(0.45, "#74848a");
+  metal.addColorStop(0.72, "#e4e9e5");
+  metal.addColorStop(1, "#77858b");
+  ctx.fillStyle = metal;
   ctx.beginPath();
-  ctx.moveTo(BUCKET.x - 22, BUCKET.y - 4);
-  ctx.lineTo(BUCKET.x + 22, BUCKET.y - 4);
-  ctx.lineTo(BUCKET.x + 16, BUCKET.y + 20);
-  ctx.lineTo(BUCKET.x - 16, BUCKET.y + 20);
+  ctx.moveTo(BUCKET.x - 28, BUCKET.y - 7);
+  ctx.lineTo(BUCKET.x + 28, BUCKET.y - 7);
+  ctx.lineTo(BUCKET.x + 21, BUCKET.y + 25);
+  ctx.lineTo(BUCKET.x - 21, BUCKET.y + 25);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#ffe09a";
+  ctx.strokeStyle = "#dce4e3";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.ellipse(BUCKET.x, BUCKET.y - 7, 28, 7, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "#8b999d";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.ellipse(BUCKET.x, BUCKET.y - 4, 22, 6, 0, Math.PI, Math.PI * 2);
+  ctx.arc(BUCKET.x, BUCKET.y + 2, 24, Math.PI, 0);
   ctx.stroke();
-  ctx.strokeStyle = "#9a6432";
+  ctx.strokeStyle = "rgba(255,255,255,0.65)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(BUCKET.x, BUCKET.y, 18, Math.PI, 0);
+  ctx.moveTo(BUCKET.x - 17, BUCKET.y - 1);
+  ctx.lineTo(BUCKET.x - 13, BUCKET.y + 18);
+  ctx.moveTo(BUCKET.x + 17, BUCKET.y - 1);
+  ctx.lineTo(BUCKET.x + 13, BUCKET.y + 18);
   ctx.stroke();
   if (game.state === "LANDED" && game.stateTimer > 1.1) {
     ctx.fillStyle = "#ffb2a2";
-    ctx.beginPath();
-    ctx.ellipse(BUCKET.x, BUCKET.y - 5, 10, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(BUCKET.x - 12, BUCKET.y - 12, 24, 8);
   }
 }
 
@@ -386,8 +414,7 @@ function drawPressureMeter(ctx, game) {
 
   ctx.fillStyle = "#d9e9eb";
   ctx.font = "bold 9px Trebuchet MS";
-  ctx.fillText("PRESSURE", 960, y - 12);
-  ctx.fillText(`${Math.round(game.tension)}%`, 960, y + height + 16);
+  ctx.fillText(`PRESSURE ${Math.round(game.tension)}%`, 960, y - 12);
 }
 
 function drawReel(ctx, game) {
@@ -460,12 +487,12 @@ function drawReel(ctx, game) {
   ctx.textAlign = "center";
   ctx.fillText(`${Math.round(game.reel.rpm)} RPM`, x, y + outerRadius + 31);
   if (game.state === "REELING") {
-    const speedLabel = game.reel.rpm < REEL_MIN_RPM
+    const speedLabel = game.reel.rpm <= REEL_MIN_RPM
       ? "TOO LOW"
-      : game.reel.rpm > REEL_MAX_RPM
+      : game.reel.rpm >= REEL_MAX_RPM
         ? "TOO FAST"
         : `GOOD · ${REEL_TARGET_RPM} IDEAL`;
-    ctx.fillStyle = game.reel.rpm >= REEL_MIN_RPM && game.reel.rpm <= REEL_MAX_RPM
+    ctx.fillStyle = game.reel.rpm > REEL_MIN_RPM && game.reel.rpm < REEL_MAX_RPM
       ? "#8ff0ad"
       : "#ffd08b";
     ctx.font = "bold 10px Trebuchet MS";

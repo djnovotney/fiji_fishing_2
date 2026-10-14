@@ -3,7 +3,7 @@ const STATUS_TEXT = {
   CASTING: "Casting the line...",
   FISH_INTERESTED: "A fish is curious... hold tight!",
   BITE: "A fish took the lure! Click the Fish-On circle above it.",
-  REELING: "Circle the yellow handle clockwise: 80 RPM ideal, below 50 too slow, above 120 too fast.",
+  REELING: "Circle the yellow handle clockwise: 60 RPM ideal, 40 RPM too low, 80 RPM too fast.",
   LANDED: "Nice catch! Bringing it to the bucket...",
   ESCAPED: "The fish got away.",
   RESET: "Getting the line ready...",
@@ -43,7 +43,7 @@ export class GameUI {
       ? "Waiting for a fish to notice the lure..."
       : STATUS_TEXT[game.state] || game.state;
     this.status.textContent = game.started ? stateText : "";
-    this.score.textContent = String(game.score);
+    this.score.textContent = `${game.totalWeightLb.toFixed(1)} lb`;
     this.fishCount.textContent = String(game.fishCaught);
     this.debug.hidden = !game.debugEnabled;
     if (game.debugEnabled) {

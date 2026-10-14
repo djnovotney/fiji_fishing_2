@@ -12,7 +12,7 @@ export class Game {
     this.state = "IDLE";
     this.stateTimer = 0;
     this.elapsed = 0;
-    this.score = 0;
+    this.totalWeightLb = 0;
     this.fishCaught = 0;
     this.fish = createFishSchool();
     this.targetFish = null;
@@ -40,8 +40,6 @@ export class Game {
   castLure(x, y) {
     if (!this.started || this.state !== "IDLE" || this.hasCast) return false;
     this.setLureTarget(x, y);
-    this.lure.x = ROD_TIP.x + 18;
-    this.lure.y = TANK.waterTop + 8;
     this.lineLength = lineLengthForLure(this.lure);
     this.hasCast = true;
     this.state = "CASTING";

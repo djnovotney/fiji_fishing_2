@@ -10,6 +10,7 @@ export function createFish(id, x, y, size = 1) {
     x,
     y,
     size,
+    weightLb: 3 + Math.random() * 7,
     color: COLORS[id % COLORS.length],
     speed,
     vx: Math.cos(angle) * speed,
