@@ -350,13 +350,13 @@ function drawLineAndLure(ctx, game) {
 }
 
 function drawPressureMeter(ctx, game) {
-  const x = 940;
-  const y = 414;
+  const x = 933;
+  const y = 418;
   const width = 18;
-  const height = 150;
+  const height = 132;
 
   ctx.fillStyle = "rgba(3, 29, 44, 0.9)";
-  roundedRect(ctx, 927, y - 27, 67, height + 48, 9);
+  roundedRect(ctx, 923, y - 26, 75, height + 52, 9);
   ctx.fill();
 
   const lowHeight = height * 0.2;
@@ -378,20 +378,16 @@ function drawPressureMeter(ctx, game) {
   ctx.fill();
 
   ctx.fillStyle = "#f4ffff";
-  ctx.font = "bold 9px Trebuchet MS";
-  ctx.textAlign = "left";
-  ctx.fillText("HIGH", x + width + 4, y + 4);
-  ctx.fillText("IDEAL", x + width + 4, y + height * 0.5 + 3);
-  ctx.fillText("LOW", x + width + 4, y + height + 3);
-
-  ctx.save();
-  ctx.translate(932, y + height / 2);
-  ctx.rotate(-Math.PI / 2);
   ctx.textAlign = "center";
+  ctx.font = "bold 9px Trebuchet MS";
+  ctx.fillText("TOO HIGH", 974, y + 11);
+  ctx.fillText("IDEAL", 974, y + height * 0.5 + 3);
+  ctx.fillText("TOO LOW", 974, y + height - 5);
+
   ctx.fillStyle = "#d9e9eb";
   ctx.font = "bold 9px Trebuchet MS";
-  ctx.fillText(`PRESSURE ${Math.round(game.tension)}%`, 0, 0);
-  ctx.restore();
+  ctx.fillText("PRESSURE", 960, y - 12);
+  ctx.fillText(`${Math.round(game.tension)}%`, 960, y + height + 16);
 }
 
 function drawReel(ctx, game) {
