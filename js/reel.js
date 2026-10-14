@@ -4,6 +4,7 @@ const TAU = Math.PI * 2;
 const MAX_RPM = 240;
 const INPUT_TIMEOUT_MS = 50;
 const RPM_RESPONSE_RATE = 70;
+const PRESSURE_SENSOR_RESPONSE_RATE = RPM_RESPONSE_RATE / 2;
 
 function normalizeAngle(angle) {
   while (angle > Math.PI) angle -= TAU;
@@ -15,6 +16,7 @@ export class ReelController {
   constructor() {
     this.angle = -Math.PI / 2;
     this.rpm = 0;
+    this.pressureSensorRPM = 0;
     this.angularVelocity = 0;
     this.cumulativeRotation = 0;
     this.dragging = false;
@@ -61,12 +63,16 @@ export class ReelController {
     }
     const blend = 1 - Math.exp(-dt * RPM_RESPONSE_RATE);
     this.rpm += (this.targetRPM - this.rpm) * blend;
+    const sensorBlend = 1 - Math.exp(-dt * PRESSURE_SENSOR_RESPONSE_RATE);
+    this.pressureSensorRPM += (this.targetRPM - this.pressureSensorRPM) * sensorBlend;
     if (this.rpm < 0.5) this.rpm = 0;
+    if (this.pressureSensorRPM < 0.5) this.pressureSensorRPM = 0;
   }
 
   reset() {
     this.pointerUp();
     this.rpm = 0;
+    this.pressureSensorRPM = 0;
     this.angularVelocity = 0;
     this.cumulativeRotation = 0;
     this.angle = -Math.PI / 2;

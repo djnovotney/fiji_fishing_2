@@ -166,3 +166,25 @@ test("reel speed immediately tracks slow and fast handle movement", () => {
   reel.update(0.016, 1128);
   assert.equal(reelSpeedZone(reel.rpm), "TOO FAST");
 });
+
+test("pressure sensor response rate is exactly half the reel RPM response rate", () => {
+  const reel = new ReelController();
+  const dt = 0.016;
+  reel.targetRPM = 100;
+  reel.dragging = true;
+  reel.lastInputAt = 1000;
+  reel.update(dt, 1016);
+
+  const reelRPMAfterIncrease = reel.rpm;
+  const sensorRPMAfterIncrease = reel.pressureSensorRPM;
+  assert.ok(Math.abs(
+    sensorRPMAfterIncrease - 100 * (1 - Math.exp(-dt * 35)),
+  ) < 0.001);
+  assert.ok(reelRPMAfterIncrease > sensorRPMAfterIncrease);
+
+  reel.targetRPM = 0;
+  reel.update(dt, 1032);
+  assert.ok(Math.abs(
+    reel.pressureSensorRPM - sensorRPMAfterIncrease * Math.exp(-dt * 35),
+  ) < 0.001);
+});

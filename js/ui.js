@@ -51,6 +51,7 @@ export class GameUI {
       this.debug.textContent = [
         `STATE: ${game.state}`,
         `REEL RPM: ${game.reel.rpm.toFixed(1)}`,
+        `SENSOR RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
         `ANGULAR VELOCITY: ${game.reel.angularVelocity.toFixed(2)} rad/s`,
         `TENSION: ${game.tension.toFixed(1)}%`,
         `FISH DEPTH: ${game.fishDepth.toFixed(2)} m`,

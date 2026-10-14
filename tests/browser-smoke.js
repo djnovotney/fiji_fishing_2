@@ -58,7 +58,7 @@ try {
     );
   }
   responseReel.update(0.016, 1064);
-  if (reelSpeedZone(responseReel.rpm) !== "TOO LOW") {
+  if (reelSpeedZone(responseReel.pressureSensorRPM) !== "TOO LOW") {
     throw new Error("The pressure sensor did not enter its low-speed red zone promptly.");
   }
   responseAngle = responseReel.angle;
@@ -71,8 +71,17 @@ try {
     );
   }
   responseReel.update(0.016, 1128);
-  if (reelSpeedZone(responseReel.rpm) !== "TOO FAST") {
+  responseReel.update(0.016, 1144);
+  if (reelSpeedZone(responseReel.pressureSensorRPM) !== "TOO FAST") {
     throw new Error("The pressure sensor did not enter its high-speed red zone promptly.");
+  }
+  const hysteresisReel = new ReelController();
+  hysteresisReel.targetRPM = 100;
+  hysteresisReel.dragging = true;
+  hysteresisReel.lastInputAt = 1000;
+  hysteresisReel.update(0.016, 1016);
+  if (Math.abs(hysteresisReel.pressureSensorRPM - 100 * (1 - Math.exp(-0.016 * 35))) > 0.001) {
+    throw new Error("The pressure sensor does not use exactly half the reel RPM response rate.");
   }
   game.start();
   game.start();
