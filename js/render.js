@@ -10,6 +10,7 @@ import {
   TANK,
   WORLD,
 } from "./constants.js";
+import { FishModel } from "./fish-model.js";
 
 function roundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
@@ -165,7 +166,7 @@ function drawBucket(ctx, game) {
   }
 }
 
-function drawAquarium(ctx, game) {
+function drawAquarium(ctx, game, fishModel) {
   ctx.save();
   ctx.shadowColor = "rgba(4, 16, 25, 0.45)";
   ctx.shadowBlur = 22;
@@ -206,7 +207,7 @@ function drawAquarium(ctx, game) {
   drawPlants(ctx);
   drawDecorations(ctx);
   for (const fish of game.fish) {
-    if (fish.active || fish === game.landedFish) drawFish(ctx, fish);
+    if (fish.active || fish === game.landedFish) drawFish(ctx, fish, fishModel);
   }
   drawBubbles(ctx, game.elapsed);
 
@@ -272,7 +273,11 @@ function drawDecorations(ctx) {
   }
 }
 
-function drawFish(ctx, fish) {
+function drawFish(ctx, fish, model) {
+  if (model) {
+    model.draw(ctx, fish);
+    return;
+  }
   const size = fish.size;
   ctx.save();
   ctx.translate(fish.x, fish.y + Math.sin(fish.phase) * 2.5);
@@ -520,6 +525,18 @@ export class GameRenderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.context = canvas.getContext("2d");
+    this.fishModel = null;
+    this.modelLoadError = null;
+    this.modelReady = FishModel.load(new URL("../assets/fiji-trevally.glb", import.meta.url))
+      .then((model) => {
+        this.fishModel = model;
+        return model;
+      })
+      .catch((error) => {
+        this.modelLoadError = error;
+        console.error("Unable to load the 3D fish model; using the placeholder fish.", error);
+        return null;
+      });
   }
 
   render(game) {
@@ -528,7 +545,7 @@ export class GameRenderer {
     drawBackground(ctx);
     drawPlatformAndPig(ctx);
     drawBucket(ctx, game);
-    drawAquarium(ctx, game);
+    drawAquarium(ctx, game, this.fishModel);
     drawLineAndLure(ctx, game);
     if (game.state === "REELING") drawPressureMeter(ctx, game);
     drawReel(ctx, game);

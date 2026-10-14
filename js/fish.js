@@ -72,7 +72,7 @@ export function updateFish(fishList, dt, elapsed, attractedFish) {
     fish.x += fish.vx * dt;
     fish.y += fish.vy * dt;
 
-    const margin = 22 * fish.size;
+    const margin = 62 * fish.size;
     if (fish.x < TANK.left + margin || fish.x > TANK.right - margin) {
       fish.vx *= -1;
       fish.x = Math.max(TANK.left + margin, Math.min(TANK.right - margin, fish.x));

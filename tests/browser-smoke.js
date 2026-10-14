@@ -32,6 +32,14 @@ function simulateRotation(reel, rpm, startTime, onStep = () => {}) {
 try {
   const game = new Game();
   const renderer = new GameRenderer(document.querySelector("#test-canvas"));
+  await renderer.modelReady;
+  if (!renderer.fishModel) throw new Error("The rigged fish GLB did not load into the game renderer.");
+  if (renderer.fishModel.document.skins[0].joints.length < 2 ||
+    renderer.fishModel.document.animations.length === 0 ||
+    !renderer.fishModel.document.meshes.some((mesh) => mesh.name === "Forked caudal fin") ||
+    !renderer.fishModel.document.meshes.some((mesh) => mesh.name === "Segmented gill plate")) {
+    throw new Error("The fish GLB is missing its articulated rig, animation, or segmented mesh parts.");
+  }
   const reel = new ReelController();
   let reelTime = simulateRotation(reel, REEL_TARGET_RPM, 1000);
   const [idealRotation] = reel.consumeCompletedRotations();
@@ -60,6 +68,12 @@ try {
   game.start();
   game.start();
   const target = game.fish[0];
+  game.fish[0].size = 0.8;
+  game.fish[1].size = 1.3;
+  const fishSizes = game.fish.map((fish) => fish.size);
+  if (Math.max(...fishSizes) - Math.min(...fishSizes) < 0.2) {
+    throw new Error("The fish school does not include visibly varying model scales.");
+  }
   const targetWeightLb = target.weightLb;
   if (targetWeightLb < 3 || targetWeightLb > 10) throw new Error("Fish weight is outside 3–10 lb.");
   target.x = 510;
@@ -103,7 +117,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: full-turn RPM, slow/fast escape, weighted catch, and reset.";
+  result.textContent = "PASS: rigged fish GLB, full-turn RPM, slow/fast escape, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;

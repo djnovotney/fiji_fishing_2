@@ -18,6 +18,7 @@ Then open <http://localhost:8000>.
 - When the small **Fish-On! (click here)** circle appears above the biting fish, click it to hook the fish. The prompt appears by the fish, not over the reel.
 - During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. Reel speed is measured once per complete turn. Aim for **40 RPM**; below **20 RPM** is too slow and above **60 RPM** is too fast.
 - The vertical pressure sensor beside the reel smooths each full-turn RPM reading. Three consecutive too-slow or too-fast turns let the fish escape; an ideal-speed turn clears the warning streak.
+- Aquarium fish use `assets/fiji-trevally.glb`, a rigged, segmented blue trevally model with a skinned body/tail, fin and gill parts, PBR lighting materials, and a tail-swim animation. Fish size varies per fish and scales the model in-game. A lightweight canvas renderer reads the local GLB, so no 3D CDN or backend is required.
 - The scoreboard totals catch weight; each fish weighs between **3 and 10 lb**.
 - Press `D` to toggle the debug overlay.
 
@@ -27,7 +28,9 @@ Publish the repository root as a static site. HTML, CSS, and module URLs are rel
 
 ## Smoke test
 
-With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop, complete-turn speed measurement, and slow/fast warning streaks. If Node.js is available, `npm test` runs the gameplay and reel-control checks.
+With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop, load the GLB model, complete-turn speed measurement, and slow/fast warning streaks. If Node.js is available, `npm test` runs the gameplay and reel-control checks.
+
+To regenerate the procedural GLB on Windows, run `powershell -ExecutionPolicy Bypass -File .\tools\generate-fish-glb.ps1`.
 
 ## Structure
 
@@ -35,5 +38,7 @@ With the local HTTP server running, open <http://localhost:8000/tests/browser-sm
 - `css/style.css` — layout and interface
 - `js/game.js`, `js/fish.js`, `js/fishing.js`, `js/reel.js` — simulation and input mechanics
 - `js/render.js` — canvas-only presentation
+- `js/fish-model.js` — GLB loader, skeletal tail posing, and lit canvas projection
 - `js/controls.js`, `js/ui.js`, `js/main.js` — browser input, interface, and the single animation loop
-- `assets/` — reserved for later art and audio phases
+- `assets/fiji-trevally.glb` — rigged fish model used by the aquarium
+- `tools/generate-fish-glb.ps1`, `tools/FishGlbGenerator.cs` — reproducible procedural GLB generator
