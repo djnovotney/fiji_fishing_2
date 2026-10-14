@@ -110,3 +110,28 @@ test("reel input measures clockwise movement and does not retrieve on counterclo
   assert.equal(reel.targetRPM, 0);
   reel.pointerUp();
 });
+
+test("reel RPM responds quickly to rotation and settles quickly when rotation stops", () => {
+  const reel = new ReelController();
+  const start = reel.angle;
+  const startX = REEL.x + Math.cos(start) * REEL.handleRadius;
+  const startY = REEL.y + Math.sin(start) * REEL.handleRadius;
+  const startTime = 1000;
+  assert.equal(reel.pointerDown(startX, startY, startTime), true);
+
+  const radiansPerSecond = REEL_TARGET_RPM * 2 * Math.PI / 60;
+  for (let sample = 1; sample <= 30; sample += 1) {
+    const angle = start + radiansPerSecond * sample / 100;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      startTime + sample * 10,
+    );
+  }
+  for (let frame = 1; frame <= 6; frame += 1) reel.update(0.016, 1300 + frame * 16);
+  assert.ok(reel.rpm > 50, "the displayed/gameplay RPM should catch up to the measured 60 RPM within 100 ms");
+
+  reel.pointerUp();
+  for (let frame = 1; frame <= 3; frame += 1) reel.update(0.016, 1400 + frame * 16);
+  assert.ok(reel.rpm < 10, "the displayed/gameplay RPM should drop promptly when rotation stops");
+});
