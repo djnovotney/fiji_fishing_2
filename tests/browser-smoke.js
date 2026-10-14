@@ -78,11 +78,15 @@ try {
   const mixedReel = new ReelController();
   simulateSegmentSpeeds(mixedReel, [45, 60, 66, 100, 35], 1000);
   const mixedReadings = mixedReel.consumeCompletedReadings();
+  const filteredSecondReading = 57 + (((60 + 66 + 100) / 3) - 57) * 0.3;
+  const filteredThirdReading = filteredSecondReading + (((66 + 100 + 35) / 3) - filteredSecondReading) * 0.3;
   if (mixedReadings.length !== 3 ||
     Math.abs(mixedReadings[0].rpm - 57) > 0.1 ||
-    Math.abs(mixedReadings[1].rpm - (60 + 66 + 100) / 3) > 0.1 ||
-    Math.abs(mixedReadings[2].rpm - (66 + 100 + 35) / 3) > 0.1) {
-    throw new Error("The pressure sensor did not refresh the rolling three-segment average.");
+    Math.abs(mixedReadings[1].averageRPM - (60 + 66 + 100) / 3) > 0.1 ||
+    Math.abs(mixedReadings[1].rpm - filteredSecondReading) > 0.1 ||
+    Math.abs(mixedReadings[2].averageRPM - (66 + 100 + 35) / 3) > 0.1 ||
+    Math.abs(mixedReadings[2].rpm - filteredThirdReading) > 0.1) {
+    throw new Error("The pressure sensor did not smooth each rolling three-segment average.");
   }
   if (reelSpeedZone(REEL_MIN_RPM - 1) !== "TOO LOW" ||
     reelSpeedZone(REEL_MIN_RPM) !== "IDEAL" ||
@@ -110,6 +114,21 @@ try {
     if ((escapeGame.state === "ESCAPED") !== expectedEscape) {
       throw new Error(`${speed} RPM escape behavior did not match its threshold.`);
     }
+  }
+  const hysteresisGame = new Game();
+  hysteresisGame.start();
+  hysteresisGame.state = "REELING";
+  hysteresisGame.targetFish = hysteresisGame.fish[0];
+  hysteresisGame.lineLength = 8;
+  simulateSegmentSpeeds(hysteresisGame.reel, [39, 39, 39], 1000);
+  hysteresisGame.update(0.01);
+  if (hysteresisGame.state !== "REELING" || hysteresisGame.reel.escapeStreak !== 1) {
+    throw new Error("One out-of-range reading should warn without losing the fish.");
+  }
+  simulateSegmentSpeeds(hysteresisGame.reel, [39], hysteresisGame.reel.lastInputAt);
+  hysteresisGame.update(0.01);
+  if (hysteresisGame.state !== "ESCAPED") {
+    throw new Error("The fish should escape after the second consecutive out-of-range reading.");
   }
   game.start();
   game.start();

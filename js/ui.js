@@ -53,7 +53,8 @@ export class GameUI {
       this.debug.textContent = [
         `STATE: ${game.state}`,
         `LAST 15° RPM: ${game.reel.segmentRPM.toFixed(1)}`,
-        `3-SEGMENT AVG RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
+        `FILTERED RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
+        `ESCAPE WARNINGS: ${game.reel.escapeStreak}/2 ${game.reel.escapeZone || ""}`,
         `ANGULAR VELOCITY: ${game.reel.angularVelocity.toFixed(2)} rad/s`,
         `TENSION: ${game.tension.toFixed(1)}%`,
         `FISH DEPTH: ${game.fishDepth.toFixed(2)} m`,

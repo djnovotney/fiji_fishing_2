@@ -5,8 +5,10 @@ import {
   REEL,
   REEL_ESCAPE_MAX_RPM,
   REEL_ESCAPE_MIN_RPM,
+  REEL_ESCAPE_CONFIRMATIONS,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
+  REEL_RPM_FILTER_ALPHA,
   REEL_SAMPLE_ANGLE,
   REEL_TARGET_RPM,
   reelSpeedZone,
@@ -117,6 +119,8 @@ test("the reel target, warning zones, and escape limits match the requested RPM 
   assert.equal(REEL_MAX_RPM, 65);
   assert.equal(REEL_ESCAPE_MIN_RPM, 40);
   assert.equal(REEL_ESCAPE_MAX_RPM, 75);
+  assert.equal(REEL_RPM_FILTER_ALPHA, 0.3);
+  assert.equal(REEL_ESCAPE_CONFIRMATIONS, 2);
   assert.equal(reelSpeedZone(49.9), "TOO LOW");
   assert.equal(reelSpeedZone(50), "IDEAL");
   assert.equal(reelSpeedZone(REEL_TARGET_RPM), "IDEAL");
@@ -139,11 +143,17 @@ test("reel input updates the gauge from a rolling average of three 15-degree seg
   reelForSegmentSpeeds(reel, [100, 35], reel.lastInputAt);
   const nextReadings = reel.consumeCompletedReadings();
   assert.equal(nextReadings.length, 2, "the sensor refreshes after each additional 15-degree segment");
-  assert.ok(Math.abs(nextReadings[0].rpm - (60 + 66 + 100) / 3) < 0.1);
-  assert.equal(nextReadings[0].escaped, true);
-  assert.ok(Math.abs(nextReadings[1].rpm - (66 + 100 + 35) / 3) < 0.1);
+  const nextAverage = (60 + 66 + 100) / 3;
+  const nextFiltered = 57 + (nextAverage - 57) * REEL_RPM_FILTER_ALPHA;
+  assert.ok(Math.abs(nextReadings[0].averageRPM - nextAverage) < 0.1);
+  assert.ok(Math.abs(nextReadings[0].rpm - nextFiltered) < 0.1);
+  assert.equal(nextReadings[0].escaped, false);
+  const finalAverage = (66 + 100 + 35) / 3;
+  const finalFiltered = nextFiltered + (finalAverage - nextFiltered) * REEL_RPM_FILTER_ALPHA;
+  assert.ok(Math.abs(nextReadings[1].averageRPM - finalAverage) < 0.1);
+  assert.ok(Math.abs(nextReadings[1].rpm - finalFiltered) < 0.1);
   assert.equal(nextReadings[1].escaped, false);
-  assert.equal(nextReadings[1].zone, "TOO FAST");
+  assert.equal(nextReadings[1].zone, "IDEAL");
 
   reel.pointerUp();
   const time = reel.lastInputAt + 100;
@@ -197,15 +207,40 @@ test("reel speed stays stable across uneven pointer samples and refreshes the ga
   assert.ok(Math.abs(reel.pressureSensorRPM - 50) < 0.1);
 });
 
-test("the fish escapes below 40 RPM or above 75 RPM, but not at the boundary", () => {
+test("escape thresholds require two consecutive filtered readings beyond the limits", () => {
   for (const [rpm, expectedEscape] of [[39, true], [40, false], [75, false], [76, true]]) {
     const game = new Game();
     game.start();
     game.state = "REELING";
     game.targetFish = game.fish[0];
     game.lineLength = 8;
-    reelForSegmentSpeeds(game.reel, [rpm, rpm, rpm], 1000);
+    reelForSegmentSpeeds(game.reel, [rpm, rpm, rpm, rpm], 1000);
     game.update(0.01);
     assert.equal(game.state === "ESCAPED", expectedEscape, `${rpm} RPM escape behavior`);
   }
+
+  const game = new Game();
+  game.start();
+  game.state = "REELING";
+  game.targetFish = game.fish[0];
+  game.lineLength = 8;
+  reelForSegmentSpeeds(game.reel, [39, 39, 39], 1000);
+  game.update(0.01);
+  assert.equal(game.state, "REELING", "one low-speed reading should only warn");
+  reelForSegmentSpeeds(game.reel, [39], game.reel.lastInputAt);
+  game.update(0.01);
+  assert.equal(game.state, "ESCAPED", "the second consecutive low-speed reading loses the fish");
+
+  const reel = new ReelController();
+  reelForSegmentSpeeds(reel, [39, 39, 39]);
+  const [firstLowReading] = reel.consumeCompletedReadings();
+  assert.equal(firstLowReading.escapeStreak, 1);
+  assert.equal(firstLowReading.escaped, false);
+  reelForSegmentSpeeds(reel, [80], reel.lastInputAt);
+  const recoveryReadings = reel.consumeCompletedReadings();
+  assert.equal(recoveryReadings[0].escapeStreak, 0, "returning inside the limits clears the escape warning");
+  reelForSegmentSpeeds(reel, Array(12).fill(39), reel.lastInputAt);
+  const repeatedLowReadings = reel.consumeCompletedReadings();
+  assert.equal(repeatedLowReadings[0].escapeStreak, 0, "the previous low-speed streak does not carry through recovery");
+  assert.ok(repeatedLowReadings.some((reading) => reading.escaped));
 });

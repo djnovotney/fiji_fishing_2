@@ -2,6 +2,8 @@ import {
   REEL,
   REEL_ESCAPE_MAX_RPM,
   REEL_ESCAPE_MIN_RPM,
+  REEL_ESCAPE_CONFIRMATIONS,
+  REEL_RPM_FILTER_ALPHA,
   REEL_SAMPLE_ANGLE,
   REEL_SAMPLE_COUNT,
   reelSpeedZone,
@@ -32,6 +34,9 @@ export class ReelController {
     this.segmentRPMSamples = [];
     this.completedReadings = [];
     this.pressureSensorZone = "TOO LOW";
+    this.hasPressureReading = false;
+    this.escapeZone = null;
+    this.escapeStreak = 0;
   }
 
   pointerDown(x, y, now = performance.now()) {
@@ -98,16 +103,33 @@ export class ReelController {
     if (this.segmentRPMSamples.length < REEL_SAMPLE_COUNT) return;
     const averageRPM = this.segmentRPMSamples.reduce((sum, sample) => sum + sample, 0) /
       REEL_SAMPLE_COUNT;
-    this.rpm = averageRPM;
-    this.pressureSensorRPM = averageRPM;
-    this.angularVelocity = averageRPM * TAU / 60;
-    const zone = reelSpeedZone(averageRPM);
+    this.pressureSensorRPM = this.hasPressureReading
+      ? this.pressureSensorRPM + (averageRPM - this.pressureSensorRPM) * REEL_RPM_FILTER_ALPHA
+      : averageRPM;
+    this.hasPressureReading = true;
+    this.rpm = this.pressureSensorRPM;
+    this.angularVelocity = this.pressureSensorRPM * TAU / 60;
+    const zone = reelSpeedZone(this.pressureSensorRPM);
+    const outOfControlRPM = this.pressureSensorRPM < REEL_ESCAPE_MIN_RPM - RPM_THRESHOLD_EPSILON
+      ? "TOO LOW"
+      : this.pressureSensorRPM > REEL_ESCAPE_MAX_RPM + RPM_THRESHOLD_EPSILON
+        ? "TOO FAST"
+        : null;
+    if (outOfControlRPM) {
+      this.escapeStreak = outOfControlRPM === this.escapeZone ? this.escapeStreak + 1 : 1;
+      this.escapeZone = outOfControlRPM;
+    } else {
+      this.escapeZone = null;
+      this.escapeStreak = 0;
+    }
     this.pressureSensorZone = zone;
     this.completedReadings.push({
-      rpm: averageRPM,
+      rpm: this.pressureSensorRPM,
+      averageRPM,
       zone,
-      escaped: averageRPM < REEL_ESCAPE_MIN_RPM - RPM_THRESHOLD_EPSILON ||
-        averageRPM > REEL_ESCAPE_MAX_RPM + RPM_THRESHOLD_EPSILON,
+      escaped: this.escapeStreak >= REEL_ESCAPE_CONFIRMATIONS,
+      escapeStreak: this.escapeStreak,
+      escapeZone: this.escapeZone,
     });
   }
 
@@ -131,6 +153,9 @@ export class ReelController {
     this.cumulativeRotation = 0;
     this.completedReadings = [];
     this.pressureSensorZone = "TOO LOW";
+    this.hasPressureReading = false;
+    this.escapeZone = null;
+    this.escapeStreak = 0;
     this.angle = -Math.PI / 2;
   }
 }
