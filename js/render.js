@@ -1,4 +1,15 @@
-import { BUCKET, PLATFORM_HEIGHT, REEL, ROD_TIP, TANK, WORLD } from "./constants.js";
+import {
+  BUCKET,
+  PLATFORM_HEIGHT,
+  REEL,
+  REEL_DISPLAY_MAX_RPM,
+  REEL_MAX_RPM,
+  REEL_MIN_RPM,
+  REEL_TARGET_RPM,
+  ROD_TIP,
+  TANK,
+  WORLD,
+} from "./constants.js";
 
 function roundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
@@ -294,6 +305,7 @@ function drawBubbles(ctx, elapsed) {
 
 function drawLineAndLure(ctx, game) {
   const fighting = game.state === "REELING" || game.state === "LANDED";
+  if (!game.hasCast && !fighting) return;
   const fish = fighting ? game.targetFish || game.landedFish : null;
   const lure = fish ? { x: fish.x, y: fish.y } : game.lure;
   const tensionFactor = fighting ? game.tension / 100 : 0;
@@ -339,35 +351,48 @@ function drawLineAndLure(ctx, game) {
   }
 }
 
-function drawTensionMeter(ctx, game) {
+function drawFightMeters(ctx, game) {
   const x = 104;
-  const y = 574;
   const width = 348;
-  const height = 17;
   ctx.fillStyle = "rgba(3, 29, 44, 0.88)";
-  roundedRect(ctx, x - 8, y - 25, width + 16, 57, 10);
+  roundedRect(ctx, x - 8, 535, width + 16, 91, 10);
   ctx.fill();
+
+  const speedY = 558;
+  const speedHeight = 13;
+  const slowWidth = width * REEL_MIN_RPM / REEL_DISPLAY_MAX_RPM;
+  const idealWidth = width * (REEL_MAX_RPM - REEL_MIN_RPM) / REEL_DISPLAY_MAX_RPM;
   ctx.fillStyle = "#ed765d";
-  ctx.fillRect(x, y, width * 0.32, height);
+  ctx.fillRect(x, speedY, slowWidth, speedHeight);
   ctx.fillStyle = "#64d995";
-  ctx.fillRect(x + width * 0.32, y, width * 0.4, height);
+  ctx.fillRect(x + slowWidth, speedY, idealWidth, speedHeight);
   ctx.fillStyle = "#ed765d";
-  ctx.fillRect(x + width * 0.72, y, width * 0.28, height);
+  ctx.fillRect(x + slowWidth + idealWidth, speedY, width - slowWidth - idealWidth, speedHeight);
   ctx.fillStyle = "#f4ffff";
-  ctx.font = "bold 11px Trebuchet MS";
-  ctx.fillText("TOO LOW", x, y - 5);
-  ctx.fillText("IDEAL", x + width * 0.47, y - 5);
-  ctx.fillText("TOO HIGH", x + width * 0.81, y - 5);
+  ctx.font = "bold 10px Trebuchet MS";
+  ctx.textAlign = "center";
+  ctx.fillText(`TOO LOW · <${REEL_MIN_RPM}`, x + slowWidth / 2, speedY - 5);
+  ctx.fillText(`IDEAL · ${REEL_TARGET_RPM} RPM`, x + slowWidth + idealWidth / 2, speedY - 5);
+  ctx.fillText(`TOO FAST · >${REEL_MAX_RPM}`, x + slowWidth + idealWidth + (width - slowWidth - idealWidth) / 2, speedY - 5);
   if (game.state === "REELING") {
-    const markerX = x + width * Math.max(0, Math.min(1, game.tension / 100));
+    const markerX = x + width * Math.max(0, Math.min(1, game.reel.rpm / REEL_DISPLAY_MAX_RPM));
     ctx.fillStyle = "#fff";
     ctx.beginPath();
-    ctx.moveTo(markerX, y - 3);
-    ctx.lineTo(markerX - 6, y - 11);
-    ctx.lineTo(markerX + 6, y - 11);
+    ctx.moveTo(markerX, speedY - 2);
+    ctx.lineTo(markerX - 6, speedY - 10);
+    ctx.lineTo(markerX + 6, speedY - 10);
     ctx.closePath();
     ctx.fill();
   }
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#d9e9eb";
+  ctx.font = "bold 10px Trebuchet MS";
+  ctx.fillText(`LINE TENSION · ${Math.round(game.tension)}%`, x, 590);
+  ctx.fillStyle = "#294751";
+  ctx.fillRect(x, 596, width, 8);
+  ctx.fillStyle = game.tension > 80 || game.tension < 20 ? "#ed765d" : "#64d995";
+  ctx.fillRect(x, 596, width * game.tension / 100, 8);
 }
 
 function drawReel(ctx, game) {
@@ -435,14 +460,6 @@ function drawReel(ctx, game) {
   ctx.strokeStyle = "#fff09a";
   ctx.lineWidth = 3;
   ctx.stroke();
-  ctx.fillStyle = "#e3a42b";
-  ctx.beginPath();
-  ctx.ellipse(handleX - 1, handleY + 18, 12, 18, game.reel.angle, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.45)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
   ctx.fillStyle = "#f3ffff";
   ctx.font = "bold 14px Trebuchet MS";
   ctx.textAlign = "center";
@@ -471,7 +488,7 @@ export class GameRenderer {
     drawBucket(ctx, game);
     drawAquarium(ctx, game);
     drawLineAndLure(ctx, game);
-    drawTensionMeter(ctx, game);
+    drawFightMeters(ctx, game);
     drawReel(ctx, game);
   }
 }

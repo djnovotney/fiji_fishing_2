@@ -1,8 +1,9 @@
 const STATUS_TEXT = {
-  IDLE: "Move the lure near a fish to get its attention.",
-  FISH_INTERESTED: "A fish is curious... keep the lure in reach!",
-  BITE: "It took the lure! Click BITE NOW!",
-  REELING: "Circle the yellow handle clockwise. Aim for 200 RPM.",
+  IDLE: "Click a spot in the aquarium to cast, then wait for a bite.",
+  CASTING: "Casting the line...",
+  FISH_INTERESTED: "A fish is curious... hold tight!",
+  BITE: "A fish took the lure! Click FISH-ON!",
+  REELING: "Circle the single yellow handle clockwise. Aim for 80 RPM.",
   LANDED: "Nice catch! Bringing it to the bucket...",
   ESCAPED: "The fish got away.",
   RESET: "Getting the line ready...",
@@ -34,7 +35,10 @@ export class GameUI {
     const game = this.game;
     this.startPanel.hidden = game.started;
     this.biteButton.hidden = !game.started || game.state !== "BITE";
-    this.status.textContent = game.started ? STATUS_TEXT[game.state] || game.state : "";
+    const stateText = game.state === "IDLE" && game.hasCast
+      ? "Waiting for a fish to notice the lure..."
+      : STATUS_TEXT[game.state] || game.state;
+    this.status.textContent = game.started ? stateText : "";
     this.score.textContent = String(game.score);
     this.fishCount.textContent = String(game.fishCaught);
     this.debug.hidden = !game.debugEnabled;

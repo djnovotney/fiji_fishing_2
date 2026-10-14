@@ -1,4 +1,4 @@
-import { TANK } from "./constants.js";
+import { ROD_TIP, TANK } from "./constants.js";
 import { createFishSchool, updateFish } from "./fish.js";
 import { hookFish, lineLengthForLure, updateFishing } from "./fishing.js";
 import { ReelController } from "./reel.js";
@@ -18,7 +18,13 @@ export class Game {
     this.targetFish = null;
     this.landedFish = null;
     this.landingStart = null;
-    this.lure = { x: 500, y: 330, targetX: 500, targetY: 330 };
+    this.lure = {
+      x: ROD_TIP.x + 18,
+      y: TANK.waterTop + 8,
+      targetX: ROD_TIP.x + 18,
+      targetY: TANK.waterTop + 8,
+    };
+    this.hasCast = false;
     this.lineLength = lineLengthForLure(this.lure);
     this.fishDepth = 0;
     this.tension = 0;
@@ -31,10 +37,16 @@ export class Game {
     this.started = true;
   }
 
-  setLureTarget(x, y) {
-    if (!this.started || !["IDLE", "FISH_INTERESTED", "BITE"].includes(this.state)) return;
+  castLure(x, y) {
+    if (!this.started || this.state !== "IDLE" || this.hasCast) return false;
+    this.lure.x = ROD_TIP.x + 18;
+    this.lure.y = TANK.waterTop + 8;
     this.lure.targetX = clamp(x, TANK.left + 18, TANK.right - 18);
     this.lure.targetY = clamp(y, TANK.waterTop + 24, TANK.sandTop - 20);
+    this.hasCast = true;
+    this.state = "CASTING";
+    this.stateTimer = 0;
+    return true;
   }
 
   hookFish() {

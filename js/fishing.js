@@ -1,4 +1,11 @@
-import { LINE, REEL_TARGET_RPM, ROD_TIP, TANK } from "./constants.js";
+import {
+  LINE,
+  REEL_MAX_RPM,
+  REEL_MIN_RPM,
+  REEL_TARGET_RPM,
+  ROD_TIP,
+  TANK,
+} from "./constants.js";
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 
@@ -17,6 +24,9 @@ function finishAttempt(game, caught) {
   }
   game.targetFish = null;
   game.landedFish = null;
+  game.hasCast = false;
+  game.tension = 0;
+  game.fishDepth = 0;
   game.dangerTime = 0;
   game.reel.reset();
   setState(game, caught ? "RESET" : "ESCAPED");
@@ -37,7 +47,10 @@ export function hookFish(game) {
 export function updateFishing(game, dt) {
   game.stateTimer += dt;
 
-  if (game.state === "IDLE") {
+  if (game.state === "CASTING") {
+    if (game.stateTimer > 0.75) setState(game, "IDLE");
+  } else if (game.state === "IDLE") {
+    if (!game.hasCast) return;
     let closest = null;
     let closestDistance = Infinity;
     for (const fish of game.fish) {
@@ -95,7 +108,7 @@ export function updateFishing(game, dt) {
       0,
       100,
     );
-    if (game.tension < 20 || game.tension > 88 || rpm < 45) {
+    if (game.tension < 20 || game.tension > 88 || rpm < REEL_MIN_RPM || rpm > REEL_MAX_RPM) {
       game.dangerTime += dt;
     } else {
       game.dangerTime = Math.max(0, game.dangerTime - dt * 0.8);
@@ -126,8 +139,6 @@ export function updateFishing(game, dt) {
   } else if (game.state === "ESCAPED" && game.stateTimer > 1.2) {
     setState(game, "RESET");
   } else if (game.state === "RESET" && game.stateTimer > 0.85) {
-    game.lure.targetX = 500;
-    game.lure.targetY = 330;
     setState(game, "IDLE");
   }
 }

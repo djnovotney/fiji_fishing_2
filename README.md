@@ -15,9 +15,9 @@ Then open <http://localhost:8000>.
 ## Controls
 
 - Select **Start fishing**.
-- Move the mouse through the aquarium to move the lure.
-- When **BITE NOW!** appears over the reel, click it to hook the fish.
-- During the fight, press the yellow reel handle and keep the mouse button held while circling clockwise. Around 200 RPM is the target; slow or overly fast reeling raises the chance of losing the fish.
+- Select **Start fishing**, then click a spot in the aquarium to cast. Wait for a fish to notice the lure and bite.
+- When **FISH-ON! (click here)** appears over the reel, click it to hook the fish.
+- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. Aim for **80 RPM**. Below **50 RPM** is too slow and above **120 RPM** is too fast; either can let the fish escape if sustained.
 - Press `D` to toggle the debug overlay.
 
 ## GitHub Pages

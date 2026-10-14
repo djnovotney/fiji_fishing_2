@@ -1,13 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../js/game.js";
-import { REEL } from "../js/constants.js";
+import { REEL, REEL_MAX_RPM, REEL_MIN_RPM, REEL_TARGET_RPM } from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
 
 test("the playable loop progresses from lure interest through a scored catch and reset", () => {
   const game = new Game();
   game.start();
-  game.setLureTarget(500, 330);
 
   const target = game.fish[0];
   target.x = 510;
@@ -16,6 +15,12 @@ test("the playable loop progresses from lure interest through a scored catch and
   target.vy = 0;
   target.recoveryUntil = 0;
   for (const fish of game.fish.slice(1)) fish.recoveryUntil = 1000;
+
+  for (let i = 0; i < 20; i += 1) game.update(0.05);
+  assert.equal(game.state, "IDLE", "fish must not detect a lure before the player casts");
+  assert.equal(game.castLure(500, 330), true);
+  assert.equal(game.state, "CASTING");
+  assert.equal(game.castLure(600, 330), false, "only one cast is allowed until the attempt resets");
 
   let elapsed = 0;
   while (game.state !== "BITE" && elapsed < 10) {
@@ -27,7 +32,7 @@ test("the playable loop progresses from lure interest through a scored catch and
   assert.equal(game.state, "REELING");
 
   while (game.fishCaught === 0 && elapsed < 30) {
-    game.reel.targetRPM = 200;
+    game.reel.targetRPM = REEL_TARGET_RPM;
     game.reel.dragging = true;
     game.reel.lastInputAt = performance.now();
     game.update(0.05);
@@ -43,6 +48,12 @@ test("the playable loop progresses from lure interest through a scored catch and
   }
   assert.equal(game.state, "IDLE");
   assert.equal(game.targetFish, null);
+});
+
+test("the reel target and slow/fast thresholds match the requested RPM values", () => {
+  assert.equal(REEL_MIN_RPM, 50);
+  assert.equal(REEL_TARGET_RPM, 80);
+  assert.equal(REEL_MAX_RPM, 120);
 });
 
 test("reel input measures clockwise movement and does not retrieve on counterclockwise movement", () => {
