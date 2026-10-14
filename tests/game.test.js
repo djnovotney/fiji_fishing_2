@@ -135,3 +135,34 @@ test("reel RPM responds quickly to rotation and settles quickly when rotation st
   for (let frame = 1; frame <= 3; frame += 1) reel.update(0.016, 1400 + frame * 16);
   assert.ok(reel.rpm < 10, "the displayed/gameplay RPM should drop promptly when rotation stops");
 });
+
+test("reel speed immediately tracks slow and fast handle movement", () => {
+  const reel = new ReelController();
+  const start = reel.angle;
+  const startX = REEL.x + Math.cos(start) * REEL.handleRadius;
+  const startY = REEL.y + Math.sin(start) * REEL.handleRadius;
+  assert.equal(reel.pointerDown(startX, startY, 1000), true);
+
+  for (let sample = 1; sample <= 4; sample += 1) {
+    const angle = start + (20 * 2 * Math.PI / 60) * sample * 0.016;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      1000 + sample * 16,
+    );
+  }
+  reel.update(0.016, 1064);
+  assert.equal(reelSpeedZone(reel.rpm), "TOO LOW");
+
+  const slowAngle = reel.angle;
+  for (let sample = 1; sample <= 4; sample += 1) {
+    const angle = slowAngle + (120 * 2 * Math.PI / 60) * sample * 0.016;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      1064 + sample * 16,
+    );
+  }
+  reel.update(0.016, 1128);
+  assert.equal(reelSpeedZone(reel.rpm), "TOO FAST");
+});

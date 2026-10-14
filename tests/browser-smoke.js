@@ -42,6 +42,38 @@ try {
     reelSpeedZone(80) !== "TOO FAST") {
     throw new Error("Pressure sensor zones do not align with reel speed thresholds.");
   }
+  const responseReel = new ReelController();
+  let responseAngle = responseReel.angle;
+  responseReel.pointerDown(
+    REEL.x + Math.cos(responseAngle) * REEL.handleRadius,
+    REEL.y + Math.sin(responseAngle) * REEL.handleRadius,
+    1000,
+  );
+  for (let sample = 1; sample <= 4; sample += 1) {
+    responseAngle += (20 * 2 * Math.PI / 60) * 0.016;
+    responseReel.pointerMove(
+      REEL.x + Math.cos(responseAngle) * REEL.handleRadius,
+      REEL.y + Math.sin(responseAngle) * REEL.handleRadius,
+      1000 + sample * 16,
+    );
+  }
+  responseReel.update(0.016, 1064);
+  if (reelSpeedZone(responseReel.rpm) !== "TOO LOW") {
+    throw new Error("The pressure sensor did not enter its low-speed red zone promptly.");
+  }
+  responseAngle = responseReel.angle;
+  for (let sample = 1; sample <= 4; sample += 1) {
+    responseAngle += (120 * 2 * Math.PI / 60) * 0.016;
+    responseReel.pointerMove(
+      REEL.x + Math.cos(responseAngle) * REEL.handleRadius,
+      REEL.y + Math.sin(responseAngle) * REEL.handleRadius,
+      1064 + sample * 16,
+    );
+  }
+  responseReel.update(0.016, 1128);
+  if (reelSpeedZone(responseReel.rpm) !== "TOO FAST") {
+    throw new Error("The pressure sensor did not enter its high-speed red zone promptly.");
+  }
   game.start();
   game.start();
   const target = game.fish[0];

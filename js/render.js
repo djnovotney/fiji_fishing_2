@@ -401,13 +401,17 @@ function drawPressureMeter(ctx, game) {
 
   const meterProgress = Math.max(0, Math.min(1, game.reel.rpm / REEL_SENSOR_MAX_RPM));
   const markerY = y + height * (1 - meterProgress);
-  ctx.fillStyle = "#fff";
+  const speedZone = reelSpeedZone(game.reel.rpm);
+  ctx.fillStyle = speedZone === "IDEAL" ? "#64f09a" : "#ff6858";
   ctx.beginPath();
   ctx.moveTo(x - 4, markerY);
   ctx.lineTo(x - 11, markerY - 6);
   ctx.lineTo(x - 11, markerY + 6);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 
   ctx.fillStyle = "#f4ffff";
   ctx.textAlign = "center";
@@ -416,7 +420,7 @@ function drawPressureMeter(ctx, game) {
   ctx.fillText("IDEAL", 974, y + fastHeight + idealHeight * 0.5 + 3);
   ctx.fillText("TOO LOW", 974, y + height - 5);
 
-  ctx.fillStyle = "#d9e9eb";
+  ctx.fillStyle = speedZone === "IDEAL" ? "#64f09a" : "#ff8578";
   ctx.font = "bold 9px Trebuchet MS";
   ctx.fillText(`REEL ${Math.round(game.reel.rpm)} RPM`, 960, y - 12);
 }
