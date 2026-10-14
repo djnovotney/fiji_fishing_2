@@ -16,6 +16,9 @@ test("the playable loop progresses from lure interest through a scored catch and
   target.recoveryUntil = 0;
   for (const fish of game.fish.slice(1)) fish.recoveryUntil = 1000;
 
+  assert.equal(game.setLureTarget(500, 330), true);
+  for (let i = 0; i < 20; i += 1) game.update(0.05);
+  assert.ok(Math.abs(game.lure.x - 500) < 1, "mouse movement positions the lure before casting");
   for (let i = 0; i < 20; i += 1) game.update(0.05);
   assert.equal(game.state, "IDLE", "fish must not detect a lure before the player casts");
   assert.equal(game.castLure(500, 330), true);
@@ -61,21 +64,30 @@ test("reel input measures clockwise movement and does not retrieve on counterclo
   const start = reel.angle;
   const startX = REEL.x + Math.cos(start) * REEL.handleRadius;
   const startY = REEL.y + Math.sin(start) * REEL.handleRadius;
-  assert.equal(reel.pointerDown(startX, startY), true);
+  const startTime = 1000;
+  assert.equal(reel.pointerDown(startX, startY, startTime), true);
 
-  const clockwise = start + 0.2;
-  reel.pointerMove(
-    REEL.x + Math.cos(clockwise) * REEL.handleRadius,
-    REEL.y + Math.sin(clockwise) * REEL.handleRadius,
-  );
-  assert.ok(reel.targetRPM > 0);
+  const radiansPerSecond = REEL_TARGET_RPM * 2 * Math.PI / 60;
+  for (let sample = 1; sample <= 30; sample += 1) {
+    const angle = start + radiansPerSecond * sample / 100;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      startTime + sample * 10,
+    );
+  }
+  assert.ok(reel.targetRPM >= 75 && reel.targetRPM <= 85, "clockwise rotation should measure approximately 80 RPM");
   assert.ok(reel.cumulativeRotation > 0);
 
-  const counterclockwise = clockwise - 0.2;
-  reel.pointerMove(
-    REEL.x + Math.cos(counterclockwise) * REEL.handleRadius,
-    REEL.y + Math.sin(counterclockwise) * REEL.handleRadius,
-  );
+  const clockwise = start + radiansPerSecond * 0.3;
+  for (let sample = 1; sample <= 40; sample += 1) {
+    const angle = clockwise - radiansPerSecond * sample / 100;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      startTime + 300 + sample * 10,
+    );
+  }
   assert.equal(reel.targetRPM, 0);
   reel.pointerUp();
 });

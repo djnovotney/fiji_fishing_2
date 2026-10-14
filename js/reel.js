@@ -1,7 +1,8 @@
 import { REEL } from "./constants.js";
 
 const TAU = Math.PI * 2;
-const MAX_RPM = 420;
+const MAX_RPM = 240;
+const RPM_WINDOW_MS = 300;
 
 function normalizeAngle(angle) {
   while (angle > Math.PI) angle -= TAU;
@@ -19,29 +20,33 @@ export class ReelController {
     this.previousPointerAngle = 0;
     this.lastInputAt = 0;
     this.targetRPM = 0;
+    this.rotationSamples = [];
   }
 
-  pointerDown(x, y) {
+  pointerDown(x, y, now = performance.now()) {
     if (this.dragging) return false;
     const handleX = REEL.x + Math.cos(this.angle) * REEL.handleRadius;
     const handleY = REEL.y + Math.sin(this.angle) * REEL.handleRadius;
     if (Math.hypot(x - handleX, y - handleY) > 33) return false;
     this.dragging = true;
     this.previousPointerAngle = Math.atan2(y - REEL.y, x - REEL.x);
-    this.lastInputAt = performance.now();
+    this.lastInputAt = now;
     this.targetRPM = 0;
+    this.rotationSamples = [];
     return true;
   }
 
-  pointerMove(x, y) {
+  pointerMove(x, y, now = performance.now()) {
     if (!this.dragging) return;
-    const now = performance.now();
     const pointerAngle = Math.atan2(y - REEL.y, x - REEL.x);
     const delta = normalizeAngle(pointerAngle - this.previousPointerAngle);
-    const seconds = Math.max(0.008, (now - this.lastInputAt) / 1000);
     this.angle += delta;
-    this.angularVelocity = delta / seconds;
-    this.targetRPM = Math.min(MAX_RPM, Math.max(0, this.angularVelocity * 60 / TAU));
+    this.rotationSamples.push({ time: now, delta });
+    this.rotationSamples = this.rotationSamples.filter((sample) => now - sample.time <= RPM_WINDOW_MS);
+    const elapsed = Math.max(100, now - this.rotationSamples[0].time);
+    const rotation = this.rotationSamples.reduce((total, sample) => total + sample.delta, 0);
+    this.angularVelocity = Math.max(0, rotation / (elapsed / 1000));
+    this.targetRPM = Math.min(MAX_RPM, this.angularVelocity * 60 / TAU);
     if (delta > 0) this.cumulativeRotation += delta;
     this.previousPointerAngle = pointerAngle;
     this.lastInputAt = now;
@@ -51,10 +56,11 @@ export class ReelController {
     this.dragging = false;
     this.targetRPM = 0;
     this.angularVelocity = 0;
+    this.rotationSamples = [];
   }
 
-  update(dt) {
-    if (!this.dragging || performance.now() - this.lastInputAt > 150) {
+  update(dt, now = performance.now()) {
+    if (!this.dragging || now - this.lastInputAt > 150) {
       this.targetRPM = 0;
       this.angularVelocity = 0;
     }
@@ -68,6 +74,7 @@ export class ReelController {
     this.rpm = 0;
     this.angularVelocity = 0;
     this.cumulativeRotation = 0;
+    this.rotationSamples = [];
     this.angle = -Math.PI / 2;
   }
 }

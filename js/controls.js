@@ -13,6 +13,10 @@ export function attachControls(canvas, game) {
     const point = pointerPosition(canvas, event);
     if (game.state === "REELING" && game.reel.dragging) {
       game.reel.pointerMove(point.x, point.y);
+    } else if (game.started && game.state === "IDLE" && !game.hasCast &&
+      point.x >= TANK.left && point.x <= TANK.right &&
+      point.y >= TANK.waterTop && point.y <= TANK.sandTop) {
+      game.setLureTarget(point.x, point.y);
     }
   });
 
@@ -22,8 +26,10 @@ export function attachControls(canvas, game) {
     if (game.state === "REELING" && game.reel.pointerDown(point.x, point.y)) {
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
-    } else if (game.state === "IDLE" && point.x >= TANK.left && point.x <= TANK.right &&
-      point.y >= TANK.waterTop && point.y <= TANK.sandTop && game.castLure(point.x, point.y)) {
+    } else if (game.state === "IDLE" && !game.hasCast &&
+      point.x >= TANK.left && point.x <= TANK.right &&
+      point.y >= TANK.waterTop && point.y <= TANK.sandTop &&
+      game.castLure(point.x, point.y)) {
       event.preventDefault();
     }
   });

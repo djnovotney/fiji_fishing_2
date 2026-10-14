@@ -25,6 +25,11 @@ function finishAttempt(game, caught) {
   game.targetFish = null;
   game.landedFish = null;
   game.hasCast = false;
+  game.lure.x = ROD_TIP.x + 18;
+  game.lure.y = TANK.waterTop + 8;
+  game.lure.targetX = game.lure.x;
+  game.lure.targetY = game.lure.y;
+  game.lineLength = lineLengthForLure(game.lure);
   game.tension = 0;
   game.fishDepth = 0;
   game.dangerTime = 0;

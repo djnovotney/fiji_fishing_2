@@ -11,19 +11,31 @@ try {
   const reel = new ReelController();
   const handleX = REEL.x + Math.cos(reel.angle) * REEL.handleRadius;
   const handleY = REEL.y + Math.sin(reel.angle) * REEL.handleRadius;
-  if (!reel.pointerDown(handleX, handleY)) throw new Error("Yellow handle could not be grabbed.");
-  const clockwiseAngle = reel.angle + 0.2;
-  reel.pointerMove(
-    REEL.x + Math.cos(clockwiseAngle) * REEL.handleRadius,
-    REEL.y + Math.sin(clockwiseAngle) * REEL.handleRadius,
-  );
-  if (reel.targetRPM <= 0) throw new Error("Clockwise handle movement did not generate RPM.");
-  const reverseAngle = clockwiseAngle - 0.2;
-  reel.pointerMove(
-    REEL.x + Math.cos(reverseAngle) * REEL.handleRadius,
-    REEL.y + Math.sin(reverseAngle) * REEL.handleRadius,
-  );
-  if (reel.targetRPM !== 0) throw new Error("Counterclockwise movement generated retrieval.");
+  const reelStartTime = 1000;
+  const reelStartAngle = reel.angle;
+  if (!reel.pointerDown(handleX, handleY, reelStartTime)) throw new Error("Yellow handle could not be grabbed.");
+  const radiansPerSecond = REEL_TARGET_RPM * 2 * Math.PI / 60;
+  for (let sample = 1; sample <= 30; sample += 1) {
+    const angle = reelStartAngle + radiansPerSecond * sample / 100;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      reelStartTime + sample * 10,
+    );
+  }
+  if (reel.targetRPM < 75 || reel.targetRPM > 85) {
+    throw new Error(`Clockwise movement should measure near 80 RPM (got ${reel.targetRPM.toFixed(1)}).`);
+  }
+  const clockwiseAngle = reelStartAngle + radiansPerSecond * 0.3;
+  for (let sample = 1; sample <= 40; sample += 1) {
+    const angle = clockwiseAngle - radiansPerSecond * sample / 100;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      reelStartTime + 300 + sample * 10,
+    );
+  }
+  if (reel.targetRPM !== 0) throw new Error("Sustained counterclockwise movement generated retrieval.");
   reel.pointerUp();
   game.start();
   game.start();
@@ -33,6 +45,9 @@ try {
   target.vx = 0;
   target.vy = 0;
   for (const fish of game.fish.slice(1)) fish.recoveryUntil = 1000;
+  if (!game.setLureTarget(500, 330)) throw new Error("Mouse movement could not position the lure.");
+  for (let i = 0; i < 20; i += 1) game.update(0.05);
+  if (Math.abs(game.lure.x - 500) >= 1) throw new Error("The lure did not follow the pointer before casting.");
   for (let i = 0; i < 20; i += 1) game.update(0.05);
   if (game.state !== "IDLE") throw new Error("Fish detected a lure before a cast.");
   if (!game.castLure(500, 330)) throw new Error("Click did not cast the lure.");

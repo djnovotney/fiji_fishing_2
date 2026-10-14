@@ -39,13 +39,20 @@ export class Game {
 
   castLure(x, y) {
     if (!this.started || this.state !== "IDLE" || this.hasCast) return false;
+    this.setLureTarget(x, y);
     this.lure.x = ROD_TIP.x + 18;
     this.lure.y = TANK.waterTop + 8;
-    this.lure.targetX = clamp(x, TANK.left + 18, TANK.right - 18);
-    this.lure.targetY = clamp(y, TANK.waterTop + 24, TANK.sandTop - 20);
+    this.lineLength = lineLengthForLure(this.lure);
     this.hasCast = true;
     this.state = "CASTING";
     this.stateTimer = 0;
+    return true;
+  }
+
+  setLureTarget(x, y) {
+    if (!this.started || this.state !== "IDLE" || this.hasCast) return false;
+    this.lure.targetX = clamp(x, TANK.left + 18, TANK.right - 18);
+    this.lure.targetY = clamp(y, TANK.waterTop + 24, TANK.sandTop - 20);
     return true;
   }
 

@@ -23,4 +23,3 @@ export const LINE = Object.freeze({
 export const REEL_MIN_RPM = 50;
 export const REEL_TARGET_RPM = 80;
 export const REEL_MAX_RPM = 120;
-export const REEL_DISPLAY_MAX_RPM = 150;
