@@ -52,7 +52,7 @@ export class GameUI {
       const fish = game.targetFish || game.landedFish;
       this.debug.textContent = [
         `STATE: ${game.state}`,
-        `LAST 15° RPM: ${game.reel.segmentRPM.toFixed(1)}`,
+        `LAST 90° RPM: ${game.reel.segmentRPM.toFixed(1)}`,
         `ROLLING AVG RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
         `OUT-OF-RANGE: ${game.reel.escapeDuration.toFixed(2)}/2.00 s ${game.reel.escapeZone || ""}`,
         `ANGULAR VELOCITY: ${game.reel.angularVelocity.toFixed(2)} rad/s`,

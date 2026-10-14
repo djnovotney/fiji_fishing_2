@@ -41,13 +41,14 @@ function reelForRotations(reel, rpm, count, onStep = () => {}) {
 
 function reelForSegmentSpeeds(reel, speeds, startTime = 1000) {
   let now = startTime;
+  const segmentsPerRevolution = (Math.PI * 2) / REEL_SAMPLE_ANGLE;
   if (!reel.dragging) {
     const handleX = REEL.x + Math.cos(reel.angle) * REEL.handleRadius;
     const handleY = REEL.y + Math.sin(reel.angle) * REEL.handleRadius;
     assert.equal(reel.pointerDown(handleX, handleY, now), true);
   }
   for (const rpm of speeds) {
-    now += 60_000 / (rpm * 24);
+    now += 60_000 / (rpm * segmentsPerRevolution);
     const angle = reel.angle + REEL_SAMPLE_ANGLE;
     reel.pointerMove(
       REEL.x + Math.cos(angle) * REEL.handleRadius,
@@ -119,6 +120,7 @@ test("the reel target, warning zones, and escape limits match the requested RPM 
   assert.equal(REEL_ESCAPE_MIN_RPM, 40);
   assert.equal(REEL_ESCAPE_MAX_RPM, 75);
   assert.equal(REEL_ESCAPE_GRACE_SECONDS, 2);
+  assert.equal(REEL_SAMPLE_ANGLE, Math.PI / 2);
   assert.equal(reelSpeedZone(49.9), "TOO LOW");
   assert.equal(reelSpeedZone(50), "IDEAL");
   assert.equal(reelSpeedZone(REEL_TARGET_RPM), "IDEAL");
@@ -126,10 +128,10 @@ test("the reel target, warning zones, and escape limits match the requested RPM 
   assert.equal(reelSpeedZone(65.1), "TOO FAST");
 });
 
-test("reel input updates the gauge from a rolling average of three 15-degree segments", () => {
+test("reel input updates the gauge from a rolling average of three 90-degree segments", () => {
   const reel = new ReelController();
   reelForSegmentSpeeds(reel, [45, 60]);
-  assert.equal(reel.consumeCompletedReadings().length, 0, "the average waits for three segments");
+  assert.equal(reel.consumeCompletedReadings().length, 0, "the average waits for three 90-degree segments");
   reelForSegmentSpeeds(reel, [66], reel.lastInputAt);
   const [reading] = reel.consumeCompletedReadings();
   assert.ok(Math.abs(reading.rpm - 57) < 0.1);
@@ -140,7 +142,7 @@ test("reel input updates the gauge from a rolling average of three 15-degree seg
 
   reelForSegmentSpeeds(reel, [100, 35], reel.lastInputAt);
   const nextReadings = reel.consumeCompletedReadings();
-  assert.equal(nextReadings.length, 2, "the sensor refreshes after each additional 15-degree segment");
+  assert.equal(nextReadings.length, 2, "the sensor refreshes after each additional 90-degree segment");
   const nextAverage = (60 + 66 + 100) / 3;
   assert.ok(Math.abs(nextReadings[0].averageRPM - nextAverage) < 0.1);
   assert.ok(Math.abs(nextReadings[0].rpm - nextAverage) < 0.1);

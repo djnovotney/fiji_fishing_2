@@ -41,13 +41,14 @@ function simulateRotation(reel, rpm, startTime, onStep = () => {}) {
 
 function simulateSegmentSpeeds(reel, speeds, startTime) {
   let now = startTime;
+  const segmentsPerRevolution = (Math.PI * 2) / REEL_SAMPLE_ANGLE;
   reel.pointerDown(
     REEL.x + Math.cos(reel.angle) * REEL.handleRadius,
     REEL.y + Math.sin(reel.angle) * REEL.handleRadius,
     now,
   );
   for (const rpm of speeds) {
-    now += 60_000 / (rpm * 24);
+    now += 60_000 / (rpm * segmentsPerRevolution);
     const angle = reel.angle + REEL_SAMPLE_ANGLE;
     reel.pointerMove(
       REEL.x + Math.cos(angle) * REEL.handleRadius,
@@ -71,10 +72,10 @@ try {
   const reel = new ReelController();
   let reelTime = simulateRotation(reel, REEL_TARGET_RPM, 1000);
   const readings = reel.consumeCompletedReadings();
-  if (readings.length < 20 ||
+  if (readings.length < 2 ||
     Math.abs(readings[readings.length - 1].rpm - REEL_TARGET_RPM) > 0.1 ||
     readings[readings.length - 1].zone !== "IDEAL") {
-    throw new Error("The pressure sensor did not average and update from the three 15-degree samples.");
+    throw new Error("The pressure sensor did not average and update from the three 90-degree samples.");
   }
   const mixedReel = new ReelController();
   simulateSegmentSpeeds(mixedReel, [45, 60, 66, 100, 35], 1000);
@@ -85,7 +86,7 @@ try {
     Math.abs(mixedReadings[1].rpm - (60 + 66 + 100) / 3) > 0.1 ||
     Math.abs(mixedReadings[2].averageRPM - (66 + 100 + 35) / 3) > 0.1 ||
     Math.abs(mixedReadings[2].rpm - (66 + 100 + 35) / 3) > 0.1) {
-    throw new Error("The pressure sensor did not directly display the rolling three-segment average.");
+    throw new Error("The pressure sensor did not directly display the rolling three-segment 90-degree average.");
   }
   if (reelSpeedZone(REEL_MIN_RPM - 1) !== "TOO LOW" ||
     reelSpeedZone(REEL_MIN_RPM) !== "IDEAL" ||
@@ -209,7 +210,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: rigged fish GLB, rolling 15-degree RPM average, pressure zones, two-second escape grace, weighted catch, and reset.";
+  result.textContent = "PASS: rigged fish GLB, rolling 90-degree RPM average, pressure zones, two-second escape grace, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;

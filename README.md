@@ -16,7 +16,7 @@ Then open <http://localhost:8000>.
 
 - Select **Start fishing**, move the lure in front of a fish, and click to cast. The line settles at the selected spot; wait for the fish to approach and bite.
 - When the small **Fish-On! (click here)** circle appears at the reel's left edge, click it to set the hook.
-- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. The line reels only as the handle actually turns. Every 15° segment is measured, and the gauge directly shows the rolling average of the latest three segments. Keep the reading in the green at **50–65 RPM**; below 50 or above 65 is red. A brief excursion is okay; the fish escapes only after the average remains below **40 RPM** or above **75 RPM** for **2 seconds**.
+- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. The line reels only as the handle actually turns. Every 90° segment is measured, and the gauge directly shows the rolling average of the latest three segments. Keep the reading in the green at **50–65 RPM**; below 50 or above 65 is red. A brief excursion is okay; the fish escapes only after the average remains below **40 RPM** or above **75 RPM** for **2 seconds**.
 - Aquarium fish use `assets/fiji-trevally.glb`, a rigged, segmented blue trevally model with a skinned body/tail, fin and gill parts, PBR lighting materials, and a tail-swim animation. Fish size varies per fish and scales the model in-game. A lightweight canvas renderer reads the local GLB, so no 3D CDN or backend is required.
 - The scoreboard totals catch weight; each fish weighs between **3 and 10 lb**.
 - Press `D` to toggle the debug overlay.

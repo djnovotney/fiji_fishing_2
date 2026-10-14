@@ -27,7 +27,7 @@ export const REEL_ESCAPE_MIN_RPM = 40;
 export const REEL_ESCAPE_MAX_RPM = 75;
 export const REEL_ESCAPE_GRACE_SECONDS = 2;
 export const REEL_SENSOR_MAX_RPM = 90;
-export const REEL_SAMPLE_ANGLE = Math.PI / 12;
+export const REEL_SAMPLE_ANGLE = Math.PI / 2;
 export const REEL_SAMPLE_COUNT = 3;
 const RPM_THRESHOLD_EPSILON = 1e-6;
 
