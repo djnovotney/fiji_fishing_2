@@ -5,6 +5,7 @@ import {
   REEL_ESCAPE_MIN_RPM,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
+  REEL_RPM_FILTER_ALPHA,
   REEL_SAMPLE_ANGLE,
   REEL_TARGET_RPM,
   reelSpeedZone,
@@ -78,8 +79,10 @@ try {
   const mixedReel = new ReelController();
   simulateSegmentSpeeds(mixedReel, [45, 60, 66, 100, 35], 1000);
   const mixedReadings = mixedReel.consumeCompletedReadings();
-  const filteredSecondReading = 57 + (((60 + 66 + 100) / 3) - 57) * 0.3;
-  const filteredThirdReading = filteredSecondReading + (((66 + 100 + 35) / 3) - filteredSecondReading) * 0.3;
+  const filteredSecondReading = 57 +
+    (((60 + 66 + 100) / 3) - 57) * REEL_RPM_FILTER_ALPHA;
+  const filteredThirdReading = filteredSecondReading +
+    (((66 + 100 + 35) / 3) - filteredSecondReading) * REEL_RPM_FILTER_ALPHA;
   if (mixedReadings.length !== 3 ||
     Math.abs(mixedReadings[0].rpm - 57) > 0.1 ||
     Math.abs(mixedReadings[1].averageRPM - (60 + 66 + 100) / 3) > 0.1 ||

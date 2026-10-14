@@ -119,7 +119,7 @@ test("the reel target, warning zones, and escape limits match the requested RPM 
   assert.equal(REEL_MAX_RPM, 65);
   assert.equal(REEL_ESCAPE_MIN_RPM, 40);
   assert.equal(REEL_ESCAPE_MAX_RPM, 75);
-  assert.equal(REEL_RPM_FILTER_ALPHA, 0.3);
+  assert.equal(REEL_RPM_FILTER_ALPHA, 0.6);
   assert.equal(REEL_ESCAPE_CONFIRMATIONS, 2);
   assert.equal(reelSpeedZone(49.9), "TOO LOW");
   assert.equal(reelSpeedZone(50), "IDEAL");
