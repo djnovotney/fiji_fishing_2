@@ -1,9 +1,8 @@
 import {
   REEL,
   REEL_ESCAPE_MAX_RPM,
+  REEL_ESCAPE_GRACE_SECONDS,
   REEL_ESCAPE_MIN_RPM,
-  REEL_ESCAPE_CONFIRMATIONS,
-  REEL_RPM_FILTER_ALPHA,
   REEL_SAMPLE_ANGLE,
   REEL_SAMPLE_COUNT,
   reelSpeedZone,
@@ -26,6 +25,7 @@ export class ReelController {
     this.pressureSensorRPM = 0;
     this.angularVelocity = 0;
     this.cumulativeRotation = 0;
+    this.pendingReelingRotation = 0;
     this.dragging = false;
     this.previousPointerAngle = 0;
     this.lastInputAt = 0;
@@ -34,9 +34,8 @@ export class ReelController {
     this.segmentRPMSamples = [];
     this.completedReadings = [];
     this.pressureSensorZone = "TOO LOW";
-    this.hasPressureReading = false;
     this.escapeZone = null;
-    this.escapeStreak = 0;
+    this.escapeDuration = 0;
   }
 
   pointerDown(x, y, now = performance.now()) {
@@ -76,7 +75,7 @@ export class ReelController {
         const segmentRPM = segmentDuration > 0
           ? Math.min(REEL_ESCAPE_MAX_RPM * 2, 60_000 / (segmentDuration * TAU / REEL_SAMPLE_ANGLE))
           : REEL_ESCAPE_MAX_RPM * 2;
-        this.recordSegmentSpeed(segmentRPM);
+        this.recordSegmentSpeed(segmentRPM, segmentDuration);
 
         remainingDelta = Math.max(0, remainingDelta - deltaToComplete);
         remainingDuration -= durationToComplete;
@@ -87,13 +86,14 @@ export class ReelController {
 
       this.segmentProgress += remainingDelta;
       this.cumulativeRotation += delta;
+      this.pendingReelingRotation += delta;
     }
 
     this.previousPointerAngle = pointerAngle;
     this.lastInputAt = now;
   }
 
-  recordSegmentSpeed(rpm) {
+  recordSegmentSpeed(rpm, segmentDurationMs) {
     this.segmentRPM = rpm;
     this.segmentRPMSamples.push(rpm);
     if (this.segmentRPMSamples.length > REEL_SAMPLE_COUNT) {
@@ -103,38 +103,43 @@ export class ReelController {
     if (this.segmentRPMSamples.length < REEL_SAMPLE_COUNT) return;
     const averageRPM = this.segmentRPMSamples.reduce((sum, sample) => sum + sample, 0) /
       REEL_SAMPLE_COUNT;
-    this.pressureSensorRPM = this.hasPressureReading
-      ? this.pressureSensorRPM + (averageRPM - this.pressureSensorRPM) * REEL_RPM_FILTER_ALPHA
-      : averageRPM;
-    this.hasPressureReading = true;
-    this.rpm = this.pressureSensorRPM;
-    this.angularVelocity = this.pressureSensorRPM * TAU / 60;
-    const zone = reelSpeedZone(this.pressureSensorRPM);
-    const outOfControlRPM = this.pressureSensorRPM < REEL_ESCAPE_MIN_RPM - RPM_THRESHOLD_EPSILON
+    this.pressureSensorRPM = averageRPM;
+    this.rpm = averageRPM;
+    this.angularVelocity = averageRPM * TAU / 60;
+    const zone = reelSpeedZone(averageRPM);
+    const outOfControlRPM = averageRPM < REEL_ESCAPE_MIN_RPM - RPM_THRESHOLD_EPSILON
       ? "TOO LOW"
-      : this.pressureSensorRPM > REEL_ESCAPE_MAX_RPM + RPM_THRESHOLD_EPSILON
+      : averageRPM > REEL_ESCAPE_MAX_RPM + RPM_THRESHOLD_EPSILON
         ? "TOO FAST"
         : null;
     if (outOfControlRPM) {
-      this.escapeStreak = outOfControlRPM === this.escapeZone ? this.escapeStreak + 1 : 1;
+      this.escapeDuration = outOfControlRPM === this.escapeZone
+        ? this.escapeDuration + segmentDurationMs / 1000
+        : segmentDurationMs / 1000;
       this.escapeZone = outOfControlRPM;
     } else {
       this.escapeZone = null;
-      this.escapeStreak = 0;
+      this.escapeDuration = 0;
     }
     this.pressureSensorZone = zone;
     this.completedReadings.push({
-      rpm: this.pressureSensorRPM,
+      rpm: averageRPM,
       averageRPM,
       zone,
-      escaped: this.escapeStreak >= REEL_ESCAPE_CONFIRMATIONS,
-      escapeStreak: this.escapeStreak,
+      escaped: this.escapeDuration >= REEL_ESCAPE_GRACE_SECONDS,
+      escapeDuration: this.escapeDuration,
       escapeZone: this.escapeZone,
     });
   }
 
   consumeCompletedReadings() {
     return this.completedReadings.splice(0);
+  }
+
+  consumeReelingRotation() {
+    const rotation = this.pendingReelingRotation;
+    this.pendingReelingRotation = 0;
+    return rotation;
   }
 
   pointerUp() {
@@ -151,11 +156,11 @@ export class ReelController {
     this.pointerUp();
     this.pressureSensorRPM = 0;
     this.cumulativeRotation = 0;
+    this.pendingReelingRotation = 0;
     this.completedReadings = [];
     this.pressureSensorZone = "TOO LOW";
-    this.hasPressureReading = false;
     this.escapeZone = null;
-    this.escapeStreak = 0;
+    this.escapeDuration = 0;
     this.angle = -Math.PI / 2;
   }
 }

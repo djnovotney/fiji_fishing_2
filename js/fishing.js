@@ -90,10 +90,10 @@ export function updateFishing(game, dt) {
       return;
     }
 
-    const rpm = game.reel.pressureSensorRPM;
+    const reelRotation = game.reel.consumeReelingRotation();
     game.lineLength = Math.max(
       LINE.minimumLengthMeters,
-      game.lineLength - rpm / 60 * LINE.metersPerRevolution * dt,
+      game.lineLength - reelRotation / (Math.PI * 2) * LINE.metersPerRevolution,
     );
     game.fishDepth = Math.max(
       0,

@@ -2,10 +2,10 @@ import { Game } from "../js/game.js";
 import {
   REEL,
   REEL_ESCAPE_MAX_RPM,
+  REEL_ESCAPE_GRACE_SECONDS,
   REEL_ESCAPE_MIN_RPM,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
-  REEL_RPM_FILTER_ALPHA,
   REEL_SAMPLE_ANGLE,
   REEL_TARGET_RPM,
   reelSpeedZone,
@@ -79,17 +79,13 @@ try {
   const mixedReel = new ReelController();
   simulateSegmentSpeeds(mixedReel, [45, 60, 66, 100, 35], 1000);
   const mixedReadings = mixedReel.consumeCompletedReadings();
-  const filteredSecondReading = 57 +
-    (((60 + 66 + 100) / 3) - 57) * REEL_RPM_FILTER_ALPHA;
-  const filteredThirdReading = filteredSecondReading +
-    (((66 + 100 + 35) / 3) - filteredSecondReading) * REEL_RPM_FILTER_ALPHA;
   if (mixedReadings.length !== 3 ||
     Math.abs(mixedReadings[0].rpm - 57) > 0.1 ||
     Math.abs(mixedReadings[1].averageRPM - (60 + 66 + 100) / 3) > 0.1 ||
-    Math.abs(mixedReadings[1].rpm - filteredSecondReading) > 0.1 ||
+    Math.abs(mixedReadings[1].rpm - (60 + 66 + 100) / 3) > 0.1 ||
     Math.abs(mixedReadings[2].averageRPM - (66 + 100 + 35) / 3) > 0.1 ||
-    Math.abs(mixedReadings[2].rpm - filteredThirdReading) > 0.1) {
-    throw new Error("The pressure sensor did not smooth each rolling three-segment average.");
+    Math.abs(mixedReadings[2].rpm - (66 + 100 + 35) / 3) > 0.1) {
+    throw new Error("The pressure sensor did not directly display the rolling three-segment average.");
   }
   if (reelSpeedZone(REEL_MIN_RPM - 1) !== "TOO LOW" ||
     reelSpeedZone(REEL_MIN_RPM) !== "IDEAL" ||
@@ -110,10 +106,12 @@ try {
     escapeGame.targetFish = escapeGame.fish[0];
     escapeGame.lineLength = 8;
     reelTime = 1000;
-    reelTime = simulateRotation(escapeGame.reel, speed, reelTime, (dt) => {
-      escapeGame.update(dt);
-      return escapeGame.state !== "REELING";
-    });
+    for (let revolution = 0; revolution < 4 && escapeGame.state === "REELING"; revolution += 1) {
+      reelTime = simulateRotation(escapeGame.reel, speed, reelTime, (dt) => {
+        escapeGame.update(dt);
+        return escapeGame.state !== "REELING";
+      });
+    }
     if ((escapeGame.state === "ESCAPED") !== expectedEscape) {
       throw new Error(`${speed} RPM escape behavior did not match its threshold.`);
     }
@@ -125,13 +123,39 @@ try {
   hysteresisGame.lineLength = 8;
   simulateSegmentSpeeds(hysteresisGame.reel, [39, 39, 39], 1000);
   hysteresisGame.update(0.01);
-  if (hysteresisGame.state !== "REELING" || hysteresisGame.reel.escapeStreak !== 1) {
-    throw new Error("One out-of-range reading should warn without losing the fish.");
+  if (hysteresisGame.state !== "REELING" ||
+    hysteresisGame.reel.escapeDuration >= REEL_ESCAPE_GRACE_SECONDS) {
+    throw new Error("A brief out-of-range reading should not lose the fish.");
   }
-  simulateSegmentSpeeds(hysteresisGame.reel, [39], hysteresisGame.reel.lastInputAt);
+  simulateSegmentSpeeds(hysteresisGame.reel, [60, 60, 60], hysteresisGame.reel.lastInputAt);
   hysteresisGame.update(0.01);
+  if (hysteresisGame.reel.escapeDuration !== 0) {
+    throw new Error("A return inside the escape RPM range should clear the escape timer.");
+  }
+  let escapeTime = hysteresisGame.reel.lastInputAt;
+  for (let revolution = 0; revolution < 3 && hysteresisGame.state === "REELING"; revolution += 1) {
+    escapeTime = simulateRotation(hysteresisGame.reel, REEL_ESCAPE_MIN_RPM - 1, escapeTime, (dt) => {
+      hysteresisGame.update(dt);
+      return hysteresisGame.state !== "REELING";
+    });
+  }
   if (hysteresisGame.state !== "ESCAPED") {
-    throw new Error("The fish should escape after the second consecutive out-of-range reading.");
+    throw new Error("The fish should escape after two seconds below the RPM limit.");
+  }
+  const lineGame = new Game();
+  lineGame.start();
+  lineGame.state = "REELING";
+  lineGame.targetFish = lineGame.fish[0];
+  lineGame.lineLength = 8;
+  reelTime = simulateRotation(lineGame.reel, REEL_TARGET_RPM, 1000, (dt) => lineGame.update(dt));
+  if (Math.abs(lineGame.lineLength - (8 - 0.27)) > 0.01) {
+    throw new Error("One actual handle revolution should retrieve one reel increment.");
+  }
+  lineGame.reel.pointerUp();
+  const lineLengthAtStop = lineGame.lineLength;
+  lineGame.update(1);
+  if (lineGame.lineLength !== lineLengthAtStop) {
+    throw new Error("The line should stop reeling when handle movement stops.");
   }
   game.start();
   game.start();
@@ -185,7 +209,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: rigged fish GLB, rolling 15-degree RPM, pressure zones, escape limits, weighted catch, and reset.";
+  result.textContent = "PASS: rigged fish GLB, rolling 15-degree RPM average, pressure zones, two-second escape grace, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;
