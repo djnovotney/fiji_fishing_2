@@ -3,7 +3,7 @@ const STATUS_TEXT = {
   CASTING: "Casting the line...",
   FISH_INTERESTED: "A fish is curious... hold tight!",
   BITE: "A fish took the lure! Click the Fish-On circle above it.",
-  REELING: "Circle the yellow handle clockwise: 60 RPM ideal, 40 RPM too low, 80 RPM too fast.",
+  REELING: "Turn the yellow handle clockwise: 40 RPM ideal, under 20 RPM too slow, over 60 RPM too fast. Three bad turns lose the fish.",
   LANDED: "Nice catch! Bringing it to the bucket...",
   ESCAPED: "The fish got away.",
   RESET: "Getting the line ready...",
@@ -50,8 +50,9 @@ export class GameUI {
       const fish = game.targetFish || game.landedFish;
       this.debug.textContent = [
         `STATE: ${game.state}`,
-        `REEL RPM: ${game.reel.rpm.toFixed(1)}`,
-        `SENSOR RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
+        `LAST TURN RPM: ${game.reel.rpm.toFixed(1)}`,
+        `SENSOR / REEL RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
+        `BAD TURNS: ${game.reel.badRotationStreak}/3 ${game.reel.badRotationZone || ""}`,
         `ANGULAR VELOCITY: ${game.reel.angularVelocity.toFixed(2)} rad/s`,
         `TENSION: ${game.tension.toFixed(1)}%`,
         `FISH DEPTH: ${game.fishDepth.toFixed(2)} m`,

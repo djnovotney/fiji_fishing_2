@@ -10,6 +10,31 @@ import {
 } from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
 
+function reelForRotations(reel, rpm, count, onStep = () => {}) {
+  const stepsPerRotation = 64;
+  const rotationDurationMs = 60_000 / rpm;
+  const stepDurationMs = rotationDurationMs / stepsPerRotation;
+  let now = reel.lastInputAt || 1000;
+  if (!reel.dragging) {
+    const handleX = REEL.x + Math.cos(reel.angle) * REEL.handleRadius;
+    const handleY = REEL.y + Math.sin(reel.angle) * REEL.handleRadius;
+    assert.equal(reel.pointerDown(handleX, handleY, now), true);
+  }
+  for (let rotation = 0; rotation < count; rotation += 1) {
+    for (let step = 0; step < stepsPerRotation; step += 1) {
+      const angle = reel.angle + 2 * Math.PI / stepsPerRotation;
+      now += stepDurationMs;
+      reel.pointerMove(
+        REEL.x + Math.cos(angle) * REEL.handleRadius,
+        REEL.y + Math.sin(angle) * REEL.handleRadius,
+        now,
+      );
+      onStep(stepDurationMs / 1000, now);
+    }
+  }
+  return now;
+}
+
 test("the playable loop progresses from lure interest through a weighted catch and reset", () => {
   const game = new Game();
   game.start();
@@ -48,12 +73,9 @@ test("the playable loop progresses from lure interest through a weighted catch a
   assert.equal(game.hookFish(), true);
   assert.equal(game.state, "REELING");
 
-  while (game.fishCaught === 0 && elapsed < 30) {
-    game.reel.targetRPM = REEL_TARGET_RPM;
-    game.reel.dragging = true;
-    game.reel.lastInputAt = performance.now();
-    game.update(0.05);
-    elapsed += 0.05;
+  while (game.fishCaught === 0 && elapsed < 90) {
+    reelForRotations(game.reel, REEL_TARGET_RPM, 1, (dt) => game.update(dt));
+    elapsed += 60 / REEL_TARGET_RPM;
   }
   assert.equal(game.fishCaught, 1);
   assert.equal(game.totalWeightLb, targetWeightLb);
@@ -68,127 +90,101 @@ test("the playable loop progresses from lure interest through a weighted catch a
 });
 
 test("the reel target and slow/fast thresholds match the requested RPM values", () => {
-  assert.equal(REEL_MIN_RPM, 40);
-  assert.equal(REEL_TARGET_RPM, 60);
-  assert.equal(REEL_MAX_RPM, 80);
-  assert.equal(reelSpeedZone(39), "TOO LOW");
-  assert.equal(reelSpeedZone(40), "TOO LOW");
+  assert.equal(REEL_MIN_RPM, 20);
+  assert.equal(REEL_TARGET_RPM, 40);
+  assert.equal(REEL_MAX_RPM, 60);
+  assert.equal(reelSpeedZone(19), "TOO LOW");
+  assert.equal(reelSpeedZone(20), "IDEAL");
+  assert.equal(reelSpeedZone(40), "IDEAL");
+  assert.equal(reelSpeedZone(59), "IDEAL");
   assert.equal(reelSpeedZone(60), "IDEAL");
-  assert.equal(reelSpeedZone(79), "IDEAL");
-  assert.equal(reelSpeedZone(80), "TOO FAST");
+  assert.equal(reelSpeedZone(61), "TOO FAST");
 });
 
-test("reel input measures clockwise movement and does not retrieve on counterclockwise movement", () => {
+test("reel input measures clockwise speed once per complete revolution", () => {
   const reel = new ReelController();
-  const start = reel.angle;
-  const startX = REEL.x + Math.cos(start) * REEL.handleRadius;
-  const startY = REEL.y + Math.sin(start) * REEL.handleRadius;
-  const startTime = 1000;
-  assert.equal(reel.pointerDown(startX, startY, startTime), true);
-
-  const radiansPerSecond = REEL_TARGET_RPM * 2 * Math.PI / 60;
-  for (let sample = 1; sample <= 30; sample += 1) {
-    const angle = start + radiansPerSecond * sample / 100;
-    reel.pointerMove(
-      REEL.x + Math.cos(angle) * REEL.handleRadius,
-      REEL.y + Math.sin(angle) * REEL.handleRadius,
-      startTime + sample * 10,
-    );
-  }
-  assert.ok(reel.targetRPM >= 55 && reel.targetRPM <= 65, "clockwise rotation should measure approximately 60 RPM");
+  reelForRotations(reel, REEL_TARGET_RPM, 1);
+  const [rotation] = reel.consumeCompletedRotations();
+  assert.ok(Math.abs(rotation.rpm - REEL_TARGET_RPM) < 0.1);
+  assert.equal(rotation.zone, "IDEAL");
   assert.ok(reel.cumulativeRotation > 0);
+  assert.equal(reel.pressureSensorRPM, rotation.rpm);
 
-  const clockwise = start + radiansPerSecond * 0.3;
-  for (let sample = 1; sample <= 40; sample += 1) {
-    const angle = clockwise - radiansPerSecond * sample / 100;
-    reel.pointerMove(
-      REEL.x + Math.cos(angle) * REEL.handleRadius,
-      REEL.y + Math.sin(angle) * REEL.handleRadius,
-      startTime + 300 + sample * 10,
-    );
-  }
-  assert.equal(reel.targetRPM, 0);
+  reel.pointerUp();
+  const time = reel.lastInputAt + 100;
+  const handleX = REEL.x + Math.cos(reel.angle) * REEL.handleRadius;
+  const handleY = REEL.y + Math.sin(reel.angle) * REEL.handleRadius;
+  assert.equal(reel.pointerDown(handleX, handleY, time), true);
+  const counterclockwiseAngle = reel.angle - 0.2;
+  reel.pointerMove(
+    REEL.x + Math.cos(counterclockwiseAngle) * REEL.handleRadius,
+    REEL.y + Math.sin(counterclockwiseAngle) * REEL.handleRadius,
+    time + 100,
+  );
+  assert.equal(reel.consumeCompletedRotations().length, 0);
   reel.pointerUp();
 });
 
-test("reel RPM responds quickly to rotation and settles quickly when rotation stops", () => {
+test("reel speed stays stable across uneven pointer samples and smooths between turns", () => {
   const reel = new ReelController();
   const start = reel.angle;
-  const startX = REEL.x + Math.cos(start) * REEL.handleRadius;
-  const startY = REEL.y + Math.sin(start) * REEL.handleRadius;
   const startTime = 1000;
-  assert.equal(reel.pointerDown(startX, startY, startTime), true);
-
-  const radiansPerSecond = REEL_TARGET_RPM * 2 * Math.PI / 60;
-  for (let sample = 1; sample <= 30; sample += 1) {
-    const angle = start + radiansPerSecond * sample / 100;
-    reel.pointerMove(
-      REEL.x + Math.cos(angle) * REEL.handleRadius,
-      REEL.y + Math.sin(angle) * REEL.handleRadius,
-      startTime + sample * 10,
-    );
-  }
-  for (let frame = 1; frame <= 6; frame += 1) reel.update(0.016, 1300 + frame * 16);
-  assert.ok(reel.rpm > 50, "the displayed/gameplay RPM should catch up to the measured 60 RPM within 100 ms");
-
-  reel.pointerUp();
-  for (let frame = 1; frame <= 3; frame += 1) reel.update(0.016, 1400 + frame * 16);
-  assert.ok(reel.rpm < 10, "the displayed/gameplay RPM should drop promptly when rotation stops");
-});
-
-test("reel speed immediately tracks slow and fast handle movement", () => {
-  const reel = new ReelController();
-  const start = reel.angle;
-  const startX = REEL.x + Math.cos(start) * REEL.handleRadius;
-  const startY = REEL.y + Math.sin(start) * REEL.handleRadius;
-  assert.equal(reel.pointerDown(startX, startY, 1000), true);
-
-  for (let sample = 1; sample <= 4; sample += 1) {
-    const angle = start + (20 * 2 * Math.PI / 60) * sample * 0.016;
-    reel.pointerMove(
-      REEL.x + Math.cos(angle) * REEL.handleRadius,
-      REEL.y + Math.sin(angle) * REEL.handleRadius,
-      1000 + sample * 16,
-    );
-  }
-  reel.update(0.016, 1064);
-  assert.equal(reelSpeedZone(reel.rpm), "TOO LOW");
-
-  const slowAngle = reel.angle;
-  for (let sample = 1; sample <= 4; sample += 1) {
-    const angle = slowAngle + (120 * 2 * Math.PI / 60) * sample * 0.016;
-    reel.pointerMove(
-      REEL.x + Math.cos(angle) * REEL.handleRadius,
-      REEL.y + Math.sin(angle) * REEL.handleRadius,
-      1064 + sample * 16,
-    );
-  }
-  reel.update(0.016, 1128);
-  assert.equal(reelSpeedZone(reel.rpm), "TOO FAST");
-});
-
-test("pressure sensor averages reel rotation across jittering input samples", () => {
-  const reel = new ReelController();
-  const start = reel.angle;
   assert.equal(reel.pointerDown(
     REEL.x + Math.cos(start) * REEL.handleRadius,
     REEL.y + Math.sin(start) * REEL.handleRadius,
-    1000,
+    startTime,
   ), true);
-  const rpm = REEL_TARGET_RPM;
-  const radiansPerSecond = rpm * 2 * Math.PI / 60;
-  let angle = start;
-  for (let sample = 1; sample <= 100; sample += 1) {
-    const elapsedMs = sample % 2 === 0 ? 8 : 24;
-    const startTime = reel.lastInputAt;
-    angle += radiansPerSecond * (elapsedMs / 1000) * (sample % 4 < 2 ? 0.7 : 1.3);
+
+  const stepsPerRotation = 64;
+  let now = startTime;
+  for (let step = 0; step < stepsPerRotation; step += 1) {
+    const angle = start + (step + 1) * 2 * Math.PI / stepsPerRotation;
+    now += (step % 2 === 0 ? 0.5 : 1.5) * (60_000 / REEL_TARGET_RPM / stepsPerRotation);
     reel.pointerMove(
       REEL.x + Math.cos(angle) * REEL.handleRadius,
       REEL.y + Math.sin(angle) * REEL.handleRadius,
-      startTime + elapsedMs,
+      now,
     );
-    reel.update(elapsedMs / 1000, reel.lastInputAt);
   }
-  assert.ok(Math.abs(reel.pressureSensorTargetRPM - rpm) < 2, "the rolling average should ignore short-term input jitter");
-  assert.ok(Math.abs(reel.pressureSensorRPM - rpm) < 5, "the sensor should settle near the sustained handle speed");
+  const [firstRotation] = reel.consumeCompletedRotations();
+  assert.ok(Math.abs(firstRotation.rpm - REEL_TARGET_RPM) < 0.1);
+
+  const nextStart = now;
+  for (let step = 0; step < stepsPerRotation; step += 1) {
+    const angle = reel.angle + 2 * Math.PI / stepsPerRotation;
+    now = nextStart + (step + 1) * (60_000 / 50 / stepsPerRotation);
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      now,
+    );
+  }
+  const expectedSmoothedRPM = REEL_TARGET_RPM + (50 - REEL_TARGET_RPM) * 0.55;
+  assert.ok(Math.abs(reel.pressureSensorRPM - expectedSmoothedRPM) < 0.1);
+});
+
+test("three consecutive too-slow or too-fast turns lose the fish, but an ideal turn clears the streak", () => {
+  for (const [rpm, zone] of [[10, "TOO LOW"], [70, "TOO FAST"]]) {
+    const game = new Game();
+    game.start();
+    game.state = "REELING";
+    game.targetFish = game.fish[0];
+    game.lineLength = 8;
+    let now = 1000;
+    for (let turn = 1; turn <= 3; turn += 1) {
+      now = reelForRotations(game.reel, rpm, 1, (dt) => game.update(dt));
+      assert.equal(game.reel.pressureSensorZone, zone);
+      if (turn < 3) {
+        assert.equal(game.state, "REELING");
+        assert.equal(game.reel.badRotationStreak, turn);
+      }
+    }
+    assert.equal(game.state, "ESCAPED");
+  }
+
+  const reel = new ReelController();
+  reelForRotations(reel, 10, 2);
+  assert.equal(reel.badRotationStreak, 2);
+  reelForRotations(reel, REEL_TARGET_RPM, 1);
+  assert.equal(reel.badRotationStreak, 0);
 });

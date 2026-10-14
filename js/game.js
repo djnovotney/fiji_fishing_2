@@ -28,7 +28,6 @@ export class Game {
     this.lineLength = lineLengthForLure(this.lure);
     this.fishDepth = 0;
     this.tension = 0;
-    this.dangerTime = 0;
     this.reel = new ReelController();
   }
 
@@ -62,7 +61,6 @@ export class Game {
     if (!this.started) return;
     dt = Math.min(dt, 0.05);
     this.elapsed += dt;
-    this.reel.update(dt);
     const attractionState = this.state === "FISH_INTERESTED" || this.state === "BITE";
     const attractedFish = attractionState && this.targetFish ? this.targetFish : null;
     if (attractedFish) {

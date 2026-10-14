@@ -9,7 +9,6 @@ import {
   ROD_TIP,
   TANK,
   WORLD,
-  reelSpeedZone,
 } from "./constants.js";
 
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -402,7 +401,7 @@ function drawPressureMeter(ctx, game) {
   const sensorRPM = game.reel.pressureSensorRPM;
   const meterProgress = Math.max(0, Math.min(1, sensorRPM / REEL_SENSOR_MAX_RPM));
   const markerY = y + height * (1 - meterProgress);
-  const speedZone = reelSpeedZone(sensorRPM);
+  const speedZone = game.reel.pressureSensorZone;
   ctx.fillStyle = speedZone === "IDEAL" ? "#64f09a" : "#ff6858";
   ctx.beginPath();
   ctx.moveTo(x - 4, markerY);
@@ -423,7 +422,10 @@ function drawPressureMeter(ctx, game) {
 
   ctx.fillStyle = speedZone === "IDEAL" ? "#64f09a" : "#ff8578";
   ctx.font = "bold 9px Trebuchet MS";
-  ctx.fillText(`REEL ${Math.round(sensorRPM)} RPM`, 960, y - 12);
+  const sensorLabel = speedZone === "IDEAL"
+    ? `REEL ${Math.round(sensorRPM)} RPM`
+    : `${speedZone} ${game.reel.badRotationStreak}/3`;
+  ctx.fillText(sensorLabel, 960, y - 12);
 }
 
 function drawReel(ctx, game) {
@@ -494,9 +496,9 @@ function drawReel(ctx, game) {
   ctx.fillStyle = "#f3ffff";
   ctx.font = "bold 14px Trebuchet MS";
   ctx.textAlign = "center";
-  ctx.fillText(`${Math.round(game.reel.rpm)} RPM`, x, y + outerRadius + 31);
+  ctx.fillText(`${Math.round(game.reel.pressureSensorRPM)} RPM`, x, y + outerRadius + 31);
   if (game.state === "REELING") {
-    const speedZone = reelSpeedZone(game.reel.rpm);
+    const speedZone = game.reel.pressureSensorZone;
     const speedLabel = speedZone === "IDEAL" ? `GOOD · ${REEL_TARGET_RPM} IDEAL` : speedZone;
     ctx.fillStyle = speedZone === "IDEAL"
       ? "#8ff0ad"

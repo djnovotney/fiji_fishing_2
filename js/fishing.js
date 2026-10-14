@@ -1,12 +1,7 @@
 import {
   LINE,
-  REEL_MAX_RPM,
-  REEL_MIN_RPM,
-  REEL_SENSOR_MAX_RPM,
-  REEL_TARGET_RPM,
   ROD_TIP,
   TANK,
-  reelSpeedZone,
 } from "./constants.js";
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
@@ -34,7 +29,6 @@ function finishAttempt(game, caught) {
   game.lineLength = lineLengthForLure(game.lure);
   game.tension = 0;
   game.fishDepth = 0;
-  game.dangerTime = 0;
   game.reel.reset();
   setState(game, caught ? "RESET" : "ESCAPED");
 }
@@ -45,7 +39,6 @@ export function hookFish(game) {
   game.lineLength = lengthForFishY(fish.y);
   game.fishDepth = depthForFishY(fish.y);
   game.tension = 52;
-  game.dangerTime = 0;
   game.landedFish = null;
   setState(game, "REELING");
   return true;
@@ -97,7 +90,7 @@ export function updateFishing(game, dt) {
       return;
     }
 
-    const rpm = game.reel.rpm;
+    const rpm = game.reel.pressureSensorRPM;
     game.lineLength = Math.max(
       LINE.minimumLengthMeters,
       game.lineLength - rpm / 60 * LINE.metersPerRevolution * dt,
@@ -110,20 +103,21 @@ export function updateFishing(game, dt) {
     fish.x += (game.lure.x - fish.x) * Math.min(1, dt * 1.5);
     fish.y = TANK.waterTop + 22 + progress * (TANK.sandTop - TANK.waterTop - 48);
 
-    game.tension = clamp(
-      game.tension + (rpm - REEL_TARGET_RPM) * 0.055 * dt + Math.sin(game.elapsed * 2.2) * 1.2 * dt,
-      0,
-      100,
-    );
-    if (game.tension < 20 || game.tension > 88 || reelSpeedZone(rpm) !== "IDEAL") {
-      game.dangerTime += dt;
-    } else {
-      game.dangerTime = Math.max(0, game.dangerTime - dt * 0.8);
+    for (const rotation of game.reel.consumeCompletedRotations()) {
+      if (rotation.zone === "TOO LOW") {
+        game.tension = clamp(game.tension - 16, 0, 100);
+      } else if (rotation.zone === "TOO FAST") {
+        game.tension = clamp(game.tension + 16, 0, 100);
+      } else {
+        game.tension += (52 - game.tension) * 0.35;
+      }
+      if (rotation.badRotationStreak >= 3) {
+        finishAttempt(game, false);
+        return;
+      }
     }
 
-    if (game.dangerTime > 4.5) {
-      finishAttempt(game, false);
-    } else if (game.lineLength <= LINE.minimumLengthMeters + 0.02) {
+    if (game.lineLength <= LINE.minimumLengthMeters + 0.02) {
       game.landedFish = fish;
       game.landingStart = { x: fish.x, y: fish.y };
       setState(game, "LANDED");

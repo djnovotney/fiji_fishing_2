@@ -16,8 +16,8 @@ Then open <http://localhost:8000>.
 
 - Select **Start fishing**, move the lure in front of a fish, and click to cast. The line settles at the selected spot; wait for the fish to approach and bite.
 - When the small **Fish-On! (click here)** circle appears above the biting fish, click it to hook the fish. The prompt appears by the fish, not over the reel.
-- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. Aim for **60 RPM**. **40 RPM** is too slow and **80 RPM** is too fast; either can let the fish escape if sustained.
-- The vertical pressure sensor beside the reel tracks reel speed: below **40 RPM** is too low, **60 RPM** is ideal, and **80 RPM or higher** is too fast. Line tension remains a separate gameplay mechanic.
+- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. Reel speed is measured once per complete turn. Aim for **40 RPM**; below **20 RPM** is too slow and above **60 RPM** is too fast.
+- The vertical pressure sensor beside the reel smooths each full-turn RPM reading. Three consecutive too-slow or too-fast turns let the fish escape; an ideal-speed turn clears the warning streak.
 - The scoreboard totals catch weight; each fish weighs between **3 and 10 lb**.
 - Press `D` to toggle the debug overlay.
 
@@ -27,7 +27,7 @@ Publish the repository root as a static site. HTML, CSS, and module URLs are rel
 
 ## Smoke test
 
-With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop. If Node.js is available, `npm test` runs the same gameplay checks plus clockwise reel-input coverage.
+With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop, complete-turn speed measurement, and slow/fast warning streaks. If Node.js is available, `npm test` runs the gameplay and reel-control checks.
 
 ## Structure
 
