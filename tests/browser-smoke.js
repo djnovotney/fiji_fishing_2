@@ -44,44 +44,27 @@ try {
   }
   const responseReel = new ReelController();
   let responseAngle = responseReel.angle;
+  let responseTime = 1000;
   responseReel.pointerDown(
     REEL.x + Math.cos(responseAngle) * REEL.handleRadius,
     REEL.y + Math.sin(responseAngle) * REEL.handleRadius,
-    1000,
+    responseTime,
   );
-  for (let sample = 1; sample <= 4; sample += 1) {
-    responseAngle += (20 * 2 * Math.PI / 60) * 0.016;
+  for (let sample = 1; sample <= 100; sample += 1) {
+    const elapsedMs = sample % 2 === 0 ? 8 : 24;
+    responseTime += elapsedMs;
+    responseAngle += (REEL_TARGET_RPM * 2 * Math.PI / 60) *
+      (elapsedMs / 1000) * (sample % 4 < 2 ? 0.7 : 1.3);
     responseReel.pointerMove(
       REEL.x + Math.cos(responseAngle) * REEL.handleRadius,
       REEL.y + Math.sin(responseAngle) * REEL.handleRadius,
-      1000 + sample * 16,
+      responseTime,
     );
+    responseReel.update(elapsedMs / 1000, responseTime);
   }
-  responseReel.update(0.016, 1064);
-  if (reelSpeedZone(responseReel.pressureSensorRPM) !== "TOO LOW") {
-    throw new Error("The pressure sensor did not enter its low-speed red zone promptly.");
-  }
-  responseAngle = responseReel.angle;
-  for (let sample = 1; sample <= 4; sample += 1) {
-    responseAngle += (120 * 2 * Math.PI / 60) * 0.016;
-    responseReel.pointerMove(
-      REEL.x + Math.cos(responseAngle) * REEL.handleRadius,
-      REEL.y + Math.sin(responseAngle) * REEL.handleRadius,
-      1064 + sample * 16,
-    );
-  }
-  responseReel.update(0.016, 1128);
-  responseReel.update(0.016, 1144);
-  if (reelSpeedZone(responseReel.pressureSensorRPM) !== "TOO FAST") {
-    throw new Error("The pressure sensor did not enter its high-speed red zone promptly.");
-  }
-  const hysteresisReel = new ReelController();
-  hysteresisReel.targetRPM = 100;
-  hysteresisReel.dragging = true;
-  hysteresisReel.lastInputAt = 1000;
-  hysteresisReel.update(0.016, 1016);
-  if (Math.abs(hysteresisReel.pressureSensorRPM - 100 * (1 - Math.exp(-0.016 * 35))) > 0.001) {
-    throw new Error("The pressure sensor does not use exactly half the reel RPM response rate.");
+  if (Math.abs(responseReel.pressureSensorTargetRPM - REEL_TARGET_RPM) > 2 ||
+    Math.abs(responseReel.pressureSensorRPM - REEL_TARGET_RPM) > 5) {
+    throw new Error("The pressure sensor did not average jittering handle movement near 60 RPM.");
   }
   game.start();
   game.start();

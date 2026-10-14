@@ -167,24 +167,28 @@ test("reel speed immediately tracks slow and fast handle movement", () => {
   assert.equal(reelSpeedZone(reel.rpm), "TOO FAST");
 });
 
-test("pressure sensor response rate is exactly half the reel RPM response rate", () => {
+test("pressure sensor averages reel rotation across jittering input samples", () => {
   const reel = new ReelController();
-  const dt = 0.016;
-  reel.targetRPM = 100;
-  reel.dragging = true;
-  reel.lastInputAt = 1000;
-  reel.update(dt, 1016);
-
-  const reelRPMAfterIncrease = reel.rpm;
-  const sensorRPMAfterIncrease = reel.pressureSensorRPM;
-  assert.ok(Math.abs(
-    sensorRPMAfterIncrease - 100 * (1 - Math.exp(-dt * 35)),
-  ) < 0.001);
-  assert.ok(reelRPMAfterIncrease > sensorRPMAfterIncrease);
-
-  reel.targetRPM = 0;
-  reel.update(dt, 1032);
-  assert.ok(Math.abs(
-    reel.pressureSensorRPM - sensorRPMAfterIncrease * Math.exp(-dt * 35),
-  ) < 0.001);
+  const start = reel.angle;
+  assert.equal(reel.pointerDown(
+    REEL.x + Math.cos(start) * REEL.handleRadius,
+    REEL.y + Math.sin(start) * REEL.handleRadius,
+    1000,
+  ), true);
+  const rpm = REEL_TARGET_RPM;
+  const radiansPerSecond = rpm * 2 * Math.PI / 60;
+  let angle = start;
+  for (let sample = 1; sample <= 100; sample += 1) {
+    const elapsedMs = sample % 2 === 0 ? 8 : 24;
+    const startTime = reel.lastInputAt;
+    angle += radiansPerSecond * (elapsedMs / 1000) * (sample % 4 < 2 ? 0.7 : 1.3);
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      startTime + elapsedMs,
+    );
+    reel.update(elapsedMs / 1000, reel.lastInputAt);
+  }
+  assert.ok(Math.abs(reel.pressureSensorTargetRPM - rpm) < 2, "the rolling average should ignore short-term input jitter");
+  assert.ok(Math.abs(reel.pressureSensorRPM - rpm) < 5, "the sensor should settle near the sustained handle speed");
 });
