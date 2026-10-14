@@ -17,7 +17,7 @@ Then open <http://localhost:8000>.
 - Select **Start fishing**, move the lure in front of a fish, and click to cast. The line settles at the selected spot; wait for the fish to approach and bite.
 - When the small **Fish-On! (click here)** circle appears above the biting fish, click it to hook the fish. The prompt appears by the fish, not over the reel.
 - During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. Aim for **60 RPM**. **40 RPM** is too slow and **80 RPM** is too fast; either can let the fish escape if sustained.
-- The vertical pressure sensor beside the reel shows line tension while fighting.
+- The vertical pressure sensor beside the reel tracks reel speed: below **40 RPM** is too low, **60 RPM** is ideal, and **80 RPM or higher** is too fast. Line tension remains a separate gameplay mechanic.
 - The scoreboard totals catch weight; each fish weighs between **3 and 10 lb**.
 - Press `D` to toggle the debug overlay.
 

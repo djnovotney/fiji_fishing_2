@@ -4,10 +4,12 @@ import {
   REEL,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
+  REEL_SENSOR_MAX_RPM,
   REEL_TARGET_RPM,
   ROD_TIP,
   TANK,
   WORLD,
+  reelSpeedZone,
 } from "./constants.js";
 
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -387,16 +389,18 @@ function drawPressureMeter(ctx, game) {
   roundedRect(ctx, 923, y - 26, 75, height + 52, 9);
   ctx.fill();
 
-  const lowHeight = height * 0.2;
-  const idealHeight = height * 0.6;
+  const lowHeight = height * REEL_MIN_RPM / REEL_SENSOR_MAX_RPM;
+  const idealHeight = height * (REEL_MAX_RPM - REEL_MIN_RPM) / REEL_SENSOR_MAX_RPM;
+  const fastHeight = height - lowHeight - idealHeight;
   ctx.fillStyle = "#ed765d";
-  ctx.fillRect(x, y + height * 0.8, width, lowHeight);
+  ctx.fillRect(x, y + height - lowHeight, width, lowHeight);
   ctx.fillStyle = "#64d995";
-  ctx.fillRect(x, y + height * 0.2, width, idealHeight);
+  ctx.fillRect(x, y + fastHeight, width, idealHeight);
   ctx.fillStyle = "#ed765d";
-  ctx.fillRect(x, y, width, height * 0.2);
+  ctx.fillRect(x, y, width, fastHeight);
 
-  const markerY = y + height * (1 - game.tension / 100);
+  const meterProgress = Math.max(0, Math.min(1, game.reel.rpm / REEL_SENSOR_MAX_RPM));
+  const markerY = y + height * (1 - meterProgress);
   ctx.fillStyle = "#fff";
   ctx.beginPath();
   ctx.moveTo(x - 4, markerY);
@@ -408,13 +412,13 @@ function drawPressureMeter(ctx, game) {
   ctx.fillStyle = "#f4ffff";
   ctx.textAlign = "center";
   ctx.font = "bold 9px Trebuchet MS";
-  ctx.fillText("TOO HIGH", 974, y + 11);
-  ctx.fillText("IDEAL", 974, y + height * 0.5 + 3);
+  ctx.fillText("TOO FAST", 974, y + 11);
+  ctx.fillText("IDEAL", 974, y + fastHeight + idealHeight * 0.5 + 3);
   ctx.fillText("TOO LOW", 974, y + height - 5);
 
   ctx.fillStyle = "#d9e9eb";
   ctx.font = "bold 9px Trebuchet MS";
-  ctx.fillText(`PRESSURE ${Math.round(game.tension)}%`, 960, y - 12);
+  ctx.fillText(`REEL ${Math.round(game.reel.rpm)} RPM`, 960, y - 12);
 }
 
 function drawReel(ctx, game) {
@@ -487,12 +491,9 @@ function drawReel(ctx, game) {
   ctx.textAlign = "center";
   ctx.fillText(`${Math.round(game.reel.rpm)} RPM`, x, y + outerRadius + 31);
   if (game.state === "REELING") {
-    const speedLabel = game.reel.rpm <= REEL_MIN_RPM
-      ? "TOO LOW"
-      : game.reel.rpm >= REEL_MAX_RPM
-        ? "TOO FAST"
-        : `GOOD · ${REEL_TARGET_RPM} IDEAL`;
-    ctx.fillStyle = game.reel.rpm > REEL_MIN_RPM && game.reel.rpm < REEL_MAX_RPM
+    const speedZone = reelSpeedZone(game.reel.rpm);
+    const speedLabel = speedZone === "IDEAL" ? `GOOD · ${REEL_TARGET_RPM} IDEAL` : speedZone;
+    ctx.fillStyle = speedZone === "IDEAL"
       ? "#8ff0ad"
       : "#ffd08b";
     ctx.font = "bold 10px Trebuchet MS";

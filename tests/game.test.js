@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../js/game.js";
-import { REEL, REEL_MAX_RPM, REEL_MIN_RPM, REEL_TARGET_RPM } from "../js/constants.js";
+import {
+  REEL,
+  REEL_MAX_RPM,
+  REEL_MIN_RPM,
+  REEL_TARGET_RPM,
+  reelSpeedZone,
+} from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
 
 test("the playable loop progresses from lure interest through a weighted catch and reset", () => {
@@ -65,6 +71,11 @@ test("the reel target and slow/fast thresholds match the requested RPM values", 
   assert.equal(REEL_MIN_RPM, 40);
   assert.equal(REEL_TARGET_RPM, 60);
   assert.equal(REEL_MAX_RPM, 80);
+  assert.equal(reelSpeedZone(39), "TOO LOW");
+  assert.equal(reelSpeedZone(40), "TOO LOW");
+  assert.equal(reelSpeedZone(60), "IDEAL");
+  assert.equal(reelSpeedZone(79), "IDEAL");
+  assert.equal(reelSpeedZone(80), "TOO FAST");
 });
 
 test("reel input measures clockwise movement and does not retrieve on counterclockwise movement", () => {

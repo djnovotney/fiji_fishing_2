@@ -1,5 +1,5 @@
 import { Game } from "../js/game.js";
-import { REEL, REEL_TARGET_RPM } from "../js/constants.js";
+import { REEL, REEL_TARGET_RPM, reelSpeedZone } from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
 import { GameRenderer } from "../js/render.js";
 
@@ -37,6 +37,11 @@ try {
   }
   if (reel.targetRPM !== 0) throw new Error("Sustained counterclockwise movement generated retrieval.");
   reel.pointerUp();
+  if (reelSpeedZone(39) !== "TOO LOW" ||
+    reelSpeedZone(REEL_TARGET_RPM) !== "IDEAL" ||
+    reelSpeedZone(80) !== "TOO FAST") {
+    throw new Error("Pressure sensor zones do not align with reel speed thresholds.");
+  }
   game.start();
   game.start();
   const target = game.fish[0];

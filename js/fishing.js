@@ -2,9 +2,11 @@ import {
   LINE,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
+  REEL_SENSOR_MAX_RPM,
   REEL_TARGET_RPM,
   ROD_TIP,
   TANK,
+  reelSpeedZone,
 } from "./constants.js";
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
@@ -113,7 +115,7 @@ export function updateFishing(game, dt) {
       0,
       100,
     );
-    if (game.tension < 20 || game.tension > 88 || rpm <= REEL_MIN_RPM || rpm >= REEL_MAX_RPM) {
+    if (game.tension < 20 || game.tension > 88 || reelSpeedZone(rpm) !== "IDEAL") {
       game.dangerTime += dt;
     } else {
       game.dangerTime = Math.max(0, game.dangerTime - dt * 0.8);
