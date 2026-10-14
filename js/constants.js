@@ -20,13 +20,18 @@ export const LINE = Object.freeze({
   metersPerRevolution: 0.27,
 });
 
-export const REEL_MIN_RPM = 20;
-export const REEL_TARGET_RPM = 40;
-export const REEL_MAX_RPM = 60;
-export const REEL_SENSOR_MAX_RPM = 80;
+export const REEL_MIN_RPM = 50;
+export const REEL_TARGET_RPM = 57.5;
+export const REEL_MAX_RPM = 65;
+export const REEL_ESCAPE_MIN_RPM = 40;
+export const REEL_ESCAPE_MAX_RPM = 75;
+export const REEL_SENSOR_MAX_RPM = 90;
+export const REEL_SAMPLE_ANGLE = Math.PI / 12;
+export const REEL_SAMPLE_COUNT = 3;
+const RPM_THRESHOLD_EPSILON = 1e-6;
 
 export function reelSpeedZone(rpm) {
-  if (rpm < REEL_MIN_RPM) return "TOO LOW";
-  if (rpm > REEL_MAX_RPM) return "TOO FAST";
+  if (rpm < REEL_MIN_RPM - RPM_THRESHOLD_EPSILON) return "TOO LOW";
+  if (rpm > REEL_MAX_RPM + RPM_THRESHOLD_EPSILON) return "TOO FAST";
   return "IDEAL";
 }

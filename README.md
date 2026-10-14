@@ -15,9 +15,8 @@ Then open <http://localhost:8000>.
 ## Controls
 
 - Select **Start fishing**, move the lure in front of a fish, and click to cast. The line settles at the selected spot; wait for the fish to approach and bite.
-- When the small **Fish-On! (click here)** circle appears above the biting fish, click it to hook the fish. The prompt appears by the fish, not over the reel.
-- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. Reel speed is measured once per complete turn. Aim for **40 RPM**; below **20 RPM** is too slow and above **60 RPM** is too fast.
-- The vertical pressure sensor beside the reel smooths each full-turn RPM reading. Three consecutive too-slow or too-fast turns let the fish escape; an ideal-speed turn clears the warning streak.
+- When the small **Fish-On! (click here)** circle appears at the reel's left edge, click it to set the hook.
+- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. Every 15° segment is measured, and the latest three segment speeds are averaged to update the pressure sensor. Keep the average in the green at **50–65 RPM**; below 50 or above 65 is red, and below **40 RPM** or above **75 RPM** lets the fish escape.
 - Aquarium fish use `assets/fiji-trevally.glb`, a rigged, segmented blue trevally model with a skinned body/tail, fin and gill parts, PBR lighting materials, and a tail-swim animation. Fish size varies per fish and scales the model in-game. A lightweight canvas renderer reads the local GLB, so no 3D CDN or backend is required.
 - The scoreboard totals catch weight; each fish weighs between **3 and 10 lb**.
 - Press `D` to toggle the debug overlay.
@@ -28,7 +27,7 @@ Publish the repository root as a static site. HTML, CSS, and module URLs are rel
 
 ## Smoke test
 
-With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop, load the GLB model, complete-turn speed measurement, and slow/fast warning streaks. If Node.js is available, `npm test` runs the gameplay and reel-control checks.
+With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop, load the GLB model, rolling three-segment RPM measurement, pressure zones, and escape limits. If Node.js is available, `npm test` runs the gameplay and reel-control checks.
 
 To regenerate the procedural GLB on Windows, run `powershell -ExecutionPolicy Bypass -File .\tools\generate-fish-glb.ps1`.
 

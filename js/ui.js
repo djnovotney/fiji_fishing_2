@@ -1,9 +1,11 @@
+import { REEL } from "./constants.js";
+
 const STATUS_TEXT = {
   IDLE: "Move the lure in front of a fish, then click to cast.",
   CASTING: "Casting the line...",
   FISH_INTERESTED: "A fish is curious... hold tight!",
-  BITE: "A fish took the lure! Click the Fish-On circle above it.",
-  REELING: "Turn the yellow handle clockwise: 40 RPM ideal, under 20 RPM too slow, over 60 RPM too fast. Three bad turns lose the fish.",
+  BITE: "A fish took the lure! Click the Fish-On circle beside the reel to set the hook.",
+  REELING: "Turn the yellow handle clockwise. Average 50–65 RPM to stay in the green; below 40 or above 75 RPM loses the fish.",
   LANDED: "Nice catch! Bringing it to the bucket...",
   ESCAPED: "The fish got away.",
   RESET: "Getting the line ready...",
@@ -35,9 +37,9 @@ export class GameUI {
     const game = this.game;
     this.startPanel.hidden = game.started;
     this.biteButton.hidden = !game.started || game.state !== "BITE";
-    if (game.state === "BITE" && game.targetFish) {
-      this.biteButton.style.left = `${game.targetFish.x / 10}%`;
-      this.biteButton.style.top = `${Math.max(5, game.targetFish.y - 28) / 6.4}%`;
+    if (game.state === "BITE") {
+      this.biteButton.style.left = `${(REEL.x - REEL.outerRadius) / 10}%`;
+      this.biteButton.style.top = `${REEL.y / 6.4}%`;
     }
     const stateText = game.state === "IDLE" && game.hasCast
       ? "Waiting for a fish to notice the lure..."
@@ -50,9 +52,8 @@ export class GameUI {
       const fish = game.targetFish || game.landedFish;
       this.debug.textContent = [
         `STATE: ${game.state}`,
-        `LAST TURN RPM: ${game.reel.rpm.toFixed(1)}`,
-        `SENSOR / REEL RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
-        `BAD TURNS: ${game.reel.badRotationStreak}/3 ${game.reel.badRotationZone || ""}`,
+        `LAST 15° RPM: ${game.reel.segmentRPM.toFixed(1)}`,
+        `3-SEGMENT AVG RPM: ${game.reel.pressureSensorRPM.toFixed(1)}`,
         `ANGULAR VELOCITY: ${game.reel.angularVelocity.toFixed(2)} rad/s`,
         `TENSION: ${game.tension.toFixed(1)}%`,
         `FISH DEPTH: ${game.fishDepth.toFixed(2)} m`,

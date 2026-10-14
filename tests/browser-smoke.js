@@ -1,5 +1,14 @@
 import { Game } from "../js/game.js";
-import { REEL, REEL_TARGET_RPM, reelSpeedZone } from "../js/constants.js";
+import {
+  REEL,
+  REEL_ESCAPE_MAX_RPM,
+  REEL_ESCAPE_MIN_RPM,
+  REEL_MAX_RPM,
+  REEL_MIN_RPM,
+  REEL_SAMPLE_ANGLE,
+  REEL_TARGET_RPM,
+  reelSpeedZone,
+} from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
 import { GameRenderer } from "../js/render.js";
 
@@ -24,9 +33,27 @@ function simulateRotation(reel, rpm, startTime, onStep = () => {}) {
       REEL.y + Math.sin(angle) * REEL.handleRadius,
       now,
     );
-    onStep(stepSeconds);
+    if (onStep(stepSeconds)) break;
   }
   return now;
+}
+
+function simulateSegmentSpeeds(reel, speeds, startTime) {
+  let now = startTime;
+  reel.pointerDown(
+    REEL.x + Math.cos(reel.angle) * REEL.handleRadius,
+    REEL.y + Math.sin(reel.angle) * REEL.handleRadius,
+    now,
+  );
+  for (const rpm of speeds) {
+    now += 60_000 / (rpm * 24);
+    const angle = reel.angle + REEL_SAMPLE_ANGLE;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      now,
+    );
+  }
 }
 
 try {
@@ -42,27 +69,46 @@ try {
   }
   const reel = new ReelController();
   let reelTime = simulateRotation(reel, REEL_TARGET_RPM, 1000);
-  const [idealRotation] = reel.consumeCompletedRotations();
-  if (Math.abs(idealRotation.rpm - REEL_TARGET_RPM) > 0.1 || idealRotation.zone !== "IDEAL") {
-    throw new Error("The pressure sensor did not measure the complete clockwise revolution accurately.");
+  const readings = reel.consumeCompletedReadings();
+  if (readings.length < 20 ||
+    Math.abs(readings[readings.length - 1].rpm - REEL_TARGET_RPM) > 0.1 ||
+    readings[readings.length - 1].zone !== "IDEAL") {
+    throw new Error("The pressure sensor did not average and update from the three 15-degree samples.");
   }
-  if (reelSpeedZone(19) !== "TOO LOW" ||
+  const mixedReel = new ReelController();
+  simulateSegmentSpeeds(mixedReel, [45, 60, 66, 100, 35], 1000);
+  const mixedReadings = mixedReel.consumeCompletedReadings();
+  if (mixedReadings.length !== 3 ||
+    Math.abs(mixedReadings[0].rpm - 57) > 0.1 ||
+    Math.abs(mixedReadings[1].rpm - (60 + 66 + 100) / 3) > 0.1 ||
+    Math.abs(mixedReadings[2].rpm - (66 + 100 + 35) / 3) > 0.1) {
+    throw new Error("The pressure sensor did not refresh the rolling three-segment average.");
+  }
+  if (reelSpeedZone(REEL_MIN_RPM - 1) !== "TOO LOW" ||
+    reelSpeedZone(REEL_MIN_RPM) !== "IDEAL" ||
     reelSpeedZone(REEL_TARGET_RPM) !== "IDEAL" ||
-    reelSpeedZone(61) !== "TOO FAST") {
+    reelSpeedZone(REEL_MAX_RPM) !== "IDEAL" ||
+    reelSpeedZone(REEL_MAX_RPM + 1) !== "TOO FAST") {
     throw new Error("Pressure sensor zones do not align with reel speed thresholds.");
   }
-  for (const [speed, expectedZone] of [[10, "TOO LOW"], [70, "TOO FAST"]]) {
+  for (const [speed, expectedEscape] of [
+    [REEL_ESCAPE_MIN_RPM - 1, true],
+    [REEL_ESCAPE_MIN_RPM, false],
+    [REEL_ESCAPE_MAX_RPM, false],
+    [REEL_ESCAPE_MAX_RPM + 1, true],
+  ]) {
     const escapeGame = new Game();
     escapeGame.start();
     escapeGame.state = "REELING";
     escapeGame.targetFish = escapeGame.fish[0];
     escapeGame.lineLength = 8;
     reelTime = 1000;
-    for (let turn = 0; turn < 3; turn += 1) {
-      reelTime = simulateRotation(escapeGame.reel, speed, reelTime, (dt) => escapeGame.update(dt));
-    }
-    if (escapeGame.state !== "ESCAPED") {
-      throw new Error(`Three ${expectedZone.toLowerCase()} turns did not make the fish escape.`);
+    reelTime = simulateRotation(escapeGame.reel, speed, reelTime, (dt) => {
+      escapeGame.update(dt);
+      return escapeGame.state !== "REELING";
+    });
+    if ((escapeGame.state === "ESCAPED") !== expectedEscape) {
+      throw new Error(`${speed} RPM escape behavior did not match its threshold.`);
     }
   }
   game.start();
@@ -117,7 +163,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: rigged fish GLB, full-turn RPM, slow/fast escape, weighted catch, and reset.";
+  result.textContent = "PASS: rigged fish GLB, rolling 15-degree RPM, pressure zones, escape limits, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;

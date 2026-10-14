@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import { Game } from "../js/game.js";
 import {
   REEL,
+  REEL_ESCAPE_MAX_RPM,
+  REEL_ESCAPE_MIN_RPM,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
+  REEL_SAMPLE_ANGLE,
   REEL_TARGET_RPM,
   reelSpeedZone,
 } from "../js/constants.js";
@@ -31,6 +34,25 @@ function reelForRotations(reel, rpm, count, onStep = () => {}) {
       );
       onStep(stepDurationMs / 1000, now);
     }
+  }
+  return now;
+}
+
+function reelForSegmentSpeeds(reel, speeds, startTime = 1000) {
+  let now = startTime;
+  if (!reel.dragging) {
+    const handleX = REEL.x + Math.cos(reel.angle) * REEL.handleRadius;
+    const handleY = REEL.y + Math.sin(reel.angle) * REEL.handleRadius;
+    assert.equal(reel.pointerDown(handleX, handleY, now), true);
+  }
+  for (const rpm of speeds) {
+    now += 60_000 / (rpm * 24);
+    const angle = reel.angle + REEL_SAMPLE_ANGLE;
+    reel.pointerMove(
+      REEL.x + Math.cos(angle) * REEL.handleRadius,
+      REEL.y + Math.sin(angle) * REEL.handleRadius,
+      now,
+    );
   }
   return now;
 }
@@ -89,26 +111,39 @@ test("the playable loop progresses from lure interest through a weighted catch a
   assert.equal(game.targetFish, null);
 });
 
-test("the reel target and slow/fast thresholds match the requested RPM values", () => {
-  assert.equal(REEL_MIN_RPM, 20);
-  assert.equal(REEL_TARGET_RPM, 40);
-  assert.equal(REEL_MAX_RPM, 60);
-  assert.equal(reelSpeedZone(19), "TOO LOW");
-  assert.equal(reelSpeedZone(20), "IDEAL");
-  assert.equal(reelSpeedZone(40), "IDEAL");
-  assert.equal(reelSpeedZone(59), "IDEAL");
-  assert.equal(reelSpeedZone(60), "IDEAL");
-  assert.equal(reelSpeedZone(61), "TOO FAST");
+test("the reel target, warning zones, and escape limits match the requested RPM values", () => {
+  assert.equal(REEL_MIN_RPM, 50);
+  assert.equal(REEL_TARGET_RPM, 57.5);
+  assert.equal(REEL_MAX_RPM, 65);
+  assert.equal(REEL_ESCAPE_MIN_RPM, 40);
+  assert.equal(REEL_ESCAPE_MAX_RPM, 75);
+  assert.equal(reelSpeedZone(49.9), "TOO LOW");
+  assert.equal(reelSpeedZone(50), "IDEAL");
+  assert.equal(reelSpeedZone(REEL_TARGET_RPM), "IDEAL");
+  assert.equal(reelSpeedZone(65), "IDEAL");
+  assert.equal(reelSpeedZone(65.1), "TOO FAST");
 });
 
-test("reel input measures clockwise speed once per complete revolution", () => {
+test("reel input updates the gauge from a rolling average of three 15-degree segments", () => {
   const reel = new ReelController();
-  reelForRotations(reel, REEL_TARGET_RPM, 1);
-  const [rotation] = reel.consumeCompletedRotations();
-  assert.ok(Math.abs(rotation.rpm - REEL_TARGET_RPM) < 0.1);
-  assert.equal(rotation.zone, "IDEAL");
+  reelForSegmentSpeeds(reel, [45, 60]);
+  assert.equal(reel.consumeCompletedReadings().length, 0, "the average waits for three segments");
+  reelForSegmentSpeeds(reel, [66], reel.lastInputAt);
+  const [reading] = reel.consumeCompletedReadings();
+  assert.ok(Math.abs(reading.rpm - 57) < 0.1);
+  assert.equal(reading.zone, "IDEAL");
+  assert.equal(reading.escaped, false);
+  assert.ok(Math.abs(reel.pressureSensorRPM - 57) < 0.1);
   assert.ok(reel.cumulativeRotation > 0);
-  assert.equal(reel.pressureSensorRPM, rotation.rpm);
+
+  reelForSegmentSpeeds(reel, [100, 35], reel.lastInputAt);
+  const nextReadings = reel.consumeCompletedReadings();
+  assert.equal(nextReadings.length, 2, "the sensor refreshes after each additional 15-degree segment");
+  assert.ok(Math.abs(nextReadings[0].rpm - (60 + 66 + 100) / 3) < 0.1);
+  assert.equal(nextReadings[0].escaped, true);
+  assert.ok(Math.abs(nextReadings[1].rpm - (66 + 100 + 35) / 3) < 0.1);
+  assert.equal(nextReadings[1].escaped, false);
+  assert.equal(nextReadings[1].zone, "TOO FAST");
 
   reel.pointerUp();
   const time = reel.lastInputAt + 100;
@@ -121,11 +156,11 @@ test("reel input measures clockwise speed once per complete revolution", () => {
     REEL.y + Math.sin(counterclockwiseAngle) * REEL.handleRadius,
     time + 100,
   );
-  assert.equal(reel.consumeCompletedRotations().length, 0);
+  assert.equal(reel.consumeCompletedReadings().length, 0);
   reel.pointerUp();
 });
 
-test("reel speed stays stable across uneven pointer samples and smooths between turns", () => {
+test("reel speed stays stable across uneven pointer samples and refreshes the gauge on each sample", () => {
   const reel = new ReelController();
   const start = reel.angle;
   const startTime = 1000;
@@ -146,8 +181,8 @@ test("reel speed stays stable across uneven pointer samples and smooths between 
       now,
     );
   }
-  const [firstRotation] = reel.consumeCompletedRotations();
-  assert.ok(Math.abs(firstRotation.rpm - REEL_TARGET_RPM) < 0.1);
+  const [firstReading] = reel.consumeCompletedReadings();
+  assert.ok(Math.abs(firstReading.rpm - REEL_TARGET_RPM) < 0.1);
 
   const nextStart = now;
   for (let step = 0; step < stepsPerRotation; step += 1) {
@@ -159,32 +194,18 @@ test("reel speed stays stable across uneven pointer samples and smooths between 
       now,
     );
   }
-  const expectedSmoothedRPM = REEL_TARGET_RPM + (50 - REEL_TARGET_RPM) * 0.55;
-  assert.ok(Math.abs(reel.pressureSensorRPM - expectedSmoothedRPM) < 0.1);
+  assert.ok(Math.abs(reel.pressureSensorRPM - 50) < 0.1);
 });
 
-test("three consecutive too-slow or too-fast turns lose the fish, but an ideal turn clears the streak", () => {
-  for (const [rpm, zone] of [[10, "TOO LOW"], [70, "TOO FAST"]]) {
+test("the fish escapes below 40 RPM or above 75 RPM, but not at the boundary", () => {
+  for (const [rpm, expectedEscape] of [[39, true], [40, false], [75, false], [76, true]]) {
     const game = new Game();
     game.start();
     game.state = "REELING";
     game.targetFish = game.fish[0];
     game.lineLength = 8;
-    let now = 1000;
-    for (let turn = 1; turn <= 3; turn += 1) {
-      now = reelForRotations(game.reel, rpm, 1, (dt) => game.update(dt));
-      assert.equal(game.reel.pressureSensorZone, zone);
-      if (turn < 3) {
-        assert.equal(game.state, "REELING");
-        assert.equal(game.reel.badRotationStreak, turn);
-      }
-    }
-    assert.equal(game.state, "ESCAPED");
+    reelForSegmentSpeeds(game.reel, [rpm, rpm, rpm], 1000);
+    game.update(0.01);
+    assert.equal(game.state === "ESCAPED", expectedEscape, `${rpm} RPM escape behavior`);
   }
-
-  const reel = new ReelController();
-  reelForRotations(reel, 10, 2);
-  assert.equal(reel.badRotationStreak, 2);
-  reelForRotations(reel, REEL_TARGET_RPM, 1);
-  assert.equal(reel.badRotationStreak, 0);
 });

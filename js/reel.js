@@ -1,8 +1,14 @@
-import { REEL, reelSpeedZone } from "./constants.js";
+import {
+  REEL,
+  REEL_ESCAPE_MAX_RPM,
+  REEL_ESCAPE_MIN_RPM,
+  REEL_SAMPLE_ANGLE,
+  REEL_SAMPLE_COUNT,
+  reelSpeedZone,
+} from "./constants.js";
 
 const TAU = Math.PI * 2;
-const MAX_RPM = 120;
-const SENSOR_ROTATION_BLEND = 0.55;
+const RPM_THRESHOLD_EPSILON = 1e-6;
 
 function normalizeAngle(angle) {
   while (angle > Math.PI) angle -= TAU;
@@ -14,19 +20,18 @@ export class ReelController {
   constructor() {
     this.angle = -Math.PI / 2;
     this.rpm = 0;
+    this.segmentRPM = 0;
     this.pressureSensorRPM = 0;
     this.angularVelocity = 0;
     this.cumulativeRotation = 0;
     this.dragging = false;
     this.previousPointerAngle = 0;
     this.lastInputAt = 0;
-    this.rotationProgress = 0;
-    this.rotationStartedAt = null;
-    this.completedRotations = [];
-    this.hasSensorReading = false;
+    this.segmentProgress = 0;
+    this.segmentStartedAt = null;
+    this.segmentRPMSamples = [];
+    this.completedReadings = [];
     this.pressureSensorZone = "TOO LOW";
-    this.badRotationZone = null;
-    this.badRotationStreak = 0;
   }
 
   pointerDown(x, y, now = performance.now()) {
@@ -38,9 +43,11 @@ export class ReelController {
     this.previousPointerAngle = Math.atan2(y - REEL.y, x - REEL.x);
     this.lastInputAt = now;
     this.rpm = 0;
+    this.segmentRPM = 0;
     this.angularVelocity = 0;
-    this.rotationProgress = 0;
-    this.rotationStartedAt = null;
+    this.segmentProgress = 0;
+    this.segmentStartedAt = now;
+    this.segmentRPMSamples = [];
     return true;
   }
 
@@ -52,29 +59,28 @@ export class ReelController {
     this.angle += delta;
 
     if (delta > 0) {
-      if (this.rotationStartedAt === null) this.rotationStartedAt = moveStartedAt;
       let remainingDuration = Math.max(0, now - moveStartedAt);
       let remainingDelta = delta;
       let segmentStartedAt = moveStartedAt;
 
-      while (this.rotationProgress + remainingDelta >= TAU - 1e-9) {
-        const deltaToComplete = Math.min(TAU - this.rotationProgress, remainingDelta);
+      while (this.segmentProgress + remainingDelta >= REEL_SAMPLE_ANGLE - 1e-9) {
+        const deltaToComplete = Math.min(REEL_SAMPLE_ANGLE - this.segmentProgress, remainingDelta);
         const durationToComplete = remainingDuration * (deltaToComplete / remainingDelta);
         const completionTime = segmentStartedAt + durationToComplete;
-        const rotationDuration = completionTime - this.rotationStartedAt;
-        const rotationRPM = rotationDuration > 0
-          ? Math.min(MAX_RPM, 60_000 / rotationDuration)
-          : MAX_RPM;
-        this.recordRotation(rotationRPM);
+        const segmentDuration = completionTime - this.segmentStartedAt;
+        const segmentRPM = segmentDuration > 0
+          ? Math.min(REEL_ESCAPE_MAX_RPM * 2, 60_000 / (segmentDuration * TAU / REEL_SAMPLE_ANGLE))
+          : REEL_ESCAPE_MAX_RPM * 2;
+        this.recordSegmentSpeed(segmentRPM);
 
         remainingDelta = Math.max(0, remainingDelta - deltaToComplete);
         remainingDuration -= durationToComplete;
         segmentStartedAt = completionTime;
-        this.rotationProgress = 0;
-        this.rotationStartedAt = completionTime;
+        this.segmentProgress = 0;
+        this.segmentStartedAt = completionTime;
       }
 
-      this.rotationProgress += remainingDelta;
+      this.segmentProgress += remainingDelta;
       this.cumulativeRotation += delta;
     }
 
@@ -82,52 +88,49 @@ export class ReelController {
     this.lastInputAt = now;
   }
 
-  recordRotation(rpm) {
-    this.rpm = rpm;
-    this.pressureSensorRPM = !this.hasSensorReading
-      ? rpm
-      : this.pressureSensorRPM + (rpm - this.pressureSensorRPM) * SENSOR_ROTATION_BLEND;
-    this.hasSensorReading = true;
-    this.angularVelocity = rpm * TAU / 60;
-    const zone = reelSpeedZone(rpm);
-    if (zone === "IDEAL") {
-      this.badRotationZone = null;
-      this.badRotationStreak = 0;
-    } else if (zone === this.badRotationZone) {
-      this.badRotationStreak += 1;
-    } else {
-      this.badRotationZone = zone;
-      this.badRotationStreak = 1;
+  recordSegmentSpeed(rpm) {
+    this.segmentRPM = rpm;
+    this.segmentRPMSamples.push(rpm);
+    if (this.segmentRPMSamples.length > REEL_SAMPLE_COUNT) {
+      this.segmentRPMSamples.shift();
     }
+
+    if (this.segmentRPMSamples.length < REEL_SAMPLE_COUNT) return;
+    const averageRPM = this.segmentRPMSamples.reduce((sum, sample) => sum + sample, 0) /
+      REEL_SAMPLE_COUNT;
+    this.rpm = averageRPM;
+    this.pressureSensorRPM = averageRPM;
+    this.angularVelocity = averageRPM * TAU / 60;
+    const zone = reelSpeedZone(averageRPM);
     this.pressureSensorZone = zone;
-    this.completedRotations.push({
-      rpm,
+    this.completedReadings.push({
+      rpm: averageRPM,
       zone,
-      badRotationStreak: this.badRotationStreak,
+      escaped: averageRPM < REEL_ESCAPE_MIN_RPM - RPM_THRESHOLD_EPSILON ||
+        averageRPM > REEL_ESCAPE_MAX_RPM + RPM_THRESHOLD_EPSILON,
     });
   }
 
-  consumeCompletedRotations() {
-    return this.completedRotations.splice(0);
+  consumeCompletedReadings() {
+    return this.completedReadings.splice(0);
   }
 
   pointerUp() {
     this.dragging = false;
     this.rpm = 0;
+    this.segmentRPM = 0;
     this.angularVelocity = 0;
-    this.rotationProgress = 0;
-    this.rotationStartedAt = null;
+    this.segmentProgress = 0;
+    this.segmentStartedAt = null;
+    this.segmentRPMSamples = [];
   }
 
   reset() {
     this.pointerUp();
     this.pressureSensorRPM = 0;
     this.cumulativeRotation = 0;
-    this.completedRotations = [];
-    this.hasSensorReading = false;
+    this.completedReadings = [];
     this.pressureSensorZone = "TOO LOW";
-    this.badRotationZone = null;
-    this.badRotationStreak = 0;
     this.angle = -Math.PI / 2;
   }
 }

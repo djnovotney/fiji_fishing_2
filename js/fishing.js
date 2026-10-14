@@ -103,17 +103,17 @@ export function updateFishing(game, dt) {
     fish.x += (game.lure.x - fish.x) * Math.min(1, dt * 1.5);
     fish.y = TANK.waterTop + 22 + progress * (TANK.sandTop - TANK.waterTop - 48);
 
-    for (const rotation of game.reel.consumeCompletedRotations()) {
-      if (rotation.zone === "TOO LOW") {
-        game.tension = clamp(game.tension - 16, 0, 100);
-      } else if (rotation.zone === "TOO FAST") {
-        game.tension = clamp(game.tension + 16, 0, 100);
-      } else {
-        game.tension += (52 - game.tension) * 0.35;
-      }
-      if (rotation.badRotationStreak >= 3) {
+    for (const reading of game.reel.consumeCompletedReadings()) {
+      if (reading.escaped) {
         finishAttempt(game, false);
         return;
+      }
+      if (reading.zone === "TOO LOW") {
+        game.tension = clamp(game.tension - 2, 0, 100);
+      } else if (reading.zone === "TOO FAST") {
+        game.tension = clamp(game.tension + 2, 0, 100);
+      } else {
+        game.tension += (52 - game.tension) * 0.05;
       }
     }
 
