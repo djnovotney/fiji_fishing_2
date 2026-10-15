@@ -5,7 +5,7 @@ const STATUS_TEXT = {
   CASTING: "Casting the line...",
   FISH_INTERESTED: "A fish is curious... hold tight!",
   BITE: "A fish took the lure! Click the Fish-On circle beside the reel to set the hook.",
-  REELING: "Turn the yellow handle clockwise. Average 50–65 RPM to stay in the green; below 40 or above 85 RPM for two full revolutions and the fish escapes.",
+  REELING: "Turn the yellow handle clockwise",
   LANDED: "Nice catch! Bringing it to the bucket...",
   ESCAPED: "The fish got away.",
   RESET: "Getting the line ready...",
