@@ -13,6 +13,7 @@ import {
 } from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
 import { GameRenderer } from "../js/render.js";
+import { GameUI } from "../js/ui.js";
 
 const result = document.querySelector("#result");
 
@@ -64,10 +65,16 @@ try {
   if (!pageResponse.ok) throw new Error("The game page could not be loaded for layout checks.");
   const pageMarkup = await pageResponse.text();
   const tankPosition = pageMarkup.indexOf('class="game-frame"');
+  const tankEndPosition = pageMarkup.indexOf("</section>", tankPosition);
+  const statusPosition = pageMarkup.indexOf('id="status-label"');
   const instructionsPosition = pageMarkup.indexOf('class="game-instructions"');
-  if (tankPosition < 0 || instructionsPosition < tankPosition ||
+  if (tankPosition < 0 || tankEndPosition < 0 || statusPosition < tankEndPosition ||
+    instructionsPosition < statusPosition ||
     pageMarkup.indexOf("Move the lure in front of a fish", 0) < instructionsPosition) {
-    throw new Error("The full game instructions should appear beneath the fish tank.");
+    throw new Error("The state message and gameplay instructions should appear beneath the fish tank.");
+  }
+  if (pageMarkup.slice(tankPosition, tankEndPosition).includes('id="status-label"')) {
+    throw new Error("The changing state message should not overlay the fish tank.");
   }
   const startPanel = pageMarkup.slice(
     pageMarkup.indexOf('id="start-panel"'),
@@ -76,6 +83,51 @@ try {
   if (startPanel.includes("Move the lure")) {
     throw new Error("The start panel should not contain the full gameplay instructions.");
   }
+  const instructions = pageMarkup.slice(instructionsPosition);
+  if (!instructions.includes("click to cast") ||
+    !instructions.includes("click the Fish-On! circle") ||
+    !instructions.includes("50–65 RPM") ||
+    !instructions.includes("two complete revolutions") ||
+    !instructions.includes("below <strong>40 RPM</strong>") ||
+    !instructions.includes("above <strong>85 RPM</strong>")) {
+    throw new Error("The how-to-play copy should match casting, hooking, reeling, and escape rules.");
+  }
+
+  const statusFixture = document.createElement("div");
+  statusFixture.innerHTML = `
+    <div id="start-panel"></div><button id="start-button"></button>
+    <button id="bite-button"></button><div id="status-label"></div>
+    <aside id="debug-panel"></aside><span id="score"></span><span id="fish-count"></span>
+  `;
+  document.body.append(statusFixture);
+  const statusGame = new Game();
+  statusGame.started = true;
+  const statusUI = new GameUI(statusGame);
+  const expectedStatuses = {
+    IDLE: "Move the lure in front of a fish, then click to cast.",
+    CASTING: "Casting the line...",
+    FISH_INTERESTED: "A fish is curious... hold tight!",
+    BITE: "A fish took the lure! Click the Fish-On circle beside the reel to set the hook.",
+    REELING: "Turn the yellow handle",
+    LANDED: "Nice catch! Bringing it to the bucket...",
+    ESCAPED: "The fish got away.",
+    RESET: "Getting the line ready...",
+  };
+  for (const [state, expectedText] of Object.entries(expectedStatuses)) {
+    statusGame.state = state;
+    statusGame.hasCast = false;
+    statusUI.render();
+    if (statusUI.status.textContent !== expectedText) {
+      throw new Error(`Unexpected status instruction for the ${state} state.`);
+    }
+  }
+  statusGame.state = "IDLE";
+  statusGame.hasCast = true;
+  statusUI.render();
+  if (statusUI.status.textContent !== "Waiting for a fish to notice the lure...") {
+    throw new Error("The cast-waiting status should tell the player what happens next.");
+  }
+  statusFixture.remove();
 
   const game = new Game();
   const renderer = new GameRenderer(document.querySelector("#test-canvas"));
@@ -266,7 +318,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: textured fish GLB, procedural tail rig, rolling 90-degree RPM average, smooth quarter-zone pressure gauge, two-revolution escape rule, weighted catch, and reset.";
+  result.textContent = "PASS: fish GLB, all state prompts and below-tank instructions, reel RPM average, pressure gauge, escape rule, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;

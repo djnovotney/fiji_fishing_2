@@ -189,16 +189,13 @@ h1 {
 }
 
 .status-label {
-  position: absolute;
-  top: 3.5%;
-  left: 50%;
-  max-width: 55%;
-  transform: translateX(-50%);
-  color: white;
-  font-size: clamp(0.72rem, 1.55vw, 1rem);
+  min-height: 1.5em;
+  margin: 12px 4px 0;
+  color: #f4fbff;
+  font-size: clamp(0.84rem, 1.7vw, 1rem);
   font-weight: 800;
   text-align: center;
-  text-shadow: 0 2px 5px #082d3b;
+  text-shadow: 0 1px 4px #062c39;
 }
 
 .debug-panel {
@@ -216,7 +213,7 @@ h1 {
 }
 
 .game-instructions {
-  margin-top: 14px;
+  margin-top: 8px;
   padding: 16px 20px;
   border: 1px solid rgba(153, 224, 230, 0.18);
   border-radius: 12px;
