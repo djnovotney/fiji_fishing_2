@@ -5,7 +5,7 @@ const STATUS_TEXT = {
   CASTING: "Casting the line...",
   FISH_INTERESTED: "A fish is curious... hold tight!",
   BITE: "A fish took the lure! Click the Fish-On circle beside the reel to set the hook.",
-  REELING: "Turn the yellow handle clockwise",
+  REELING: "Turn the yellow handle",
   LANDED: "Nice catch! Bringing it to the bucket...",
   ESCAPED: "The fish got away.",
   RESET: "Getting the line ready...",
