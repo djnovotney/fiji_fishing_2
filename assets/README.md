@@ -1,1 +1,1 @@
-Phase 1 uses canvas placeholders and does not require external assets. Reserved for optional fish, pig, coral, prop, texture, and audio assets in later phases.
+The aquarium uses `fiji-trevally.glb`, the supplied blue trevally mesh with its embedded UV texture. Tail motion is procedurally rigged in `js/fish-model.js` because the source file contains no skeletal rig or animation tracks.

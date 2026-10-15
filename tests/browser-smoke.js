@@ -63,13 +63,33 @@ try {
   const game = new Game();
   const renderer = new GameRenderer(document.querySelector("#test-canvas"));
   await renderer.modelReady;
-  if (!renderer.fishModel) throw new Error("The rigged fish GLB did not load into the game renderer.");
-  if (renderer.fishModel.document.skins[0].joints.length < 2 ||
-    renderer.fishModel.document.animations.length === 0 ||
-    !renderer.fishModel.document.meshes.some((mesh) => mesh.name === "Forked caudal fin") ||
-    !renderer.fishModel.document.meshes.some((mesh) => mesh.name === "Segmented gill plate")) {
-    throw new Error("The fish GLB is missing its articulated rig, animation, or segmented mesh parts.");
+  if (!renderer.fishModel) throw new Error("The textured fish GLB did not load into the game renderer.");
+  if (renderer.fishModel.textureImage.width !== 1024 ||
+    !renderer.fishModel.hasProceduralTailRig ||
+    renderer.fishModel.document.meshes[0].primitives[0].attributes.TEXCOORD_0 === undefined) {
+    throw new Error("The fish GLB must preserve its texture coordinates and animate with the tail rig.");
   }
+  const fishPreview = document.createElement("canvas");
+  fishPreview.width = 112;
+  fishPreview.height = 56;
+  const fishPreviewContext = fishPreview.getContext("2d");
+  const previewFish = { x: 56, y: 28, size: 1, direction: 1, phase: 0 };
+  renderer.fishModel.draw(fishPreviewContext, previewFish);
+  const firstSwimFrame = fishPreviewContext.getImageData(0, 0, 56, 56).data;
+  previewFish.phase = Math.PI / 6.4;
+  fishPreviewContext.clearRect(0, 0, fishPreview.width, fishPreview.height);
+  renderer.fishModel.draw(fishPreviewContext, previewFish);
+  const secondSwimFrame = fishPreviewContext.getImageData(0, 0, 56, 56).data;
+  let changedTailPixels = 0;
+  for (let pixel = 0; pixel < firstSwimFrame.length; pixel += 4) {
+    if (firstSwimFrame[pixel + 3] !== secondSwimFrame[pixel + 3] ||
+      firstSwimFrame[pixel] !== secondSwimFrame[pixel] ||
+      firstSwimFrame[pixel + 1] !== secondSwimFrame[pixel + 1] ||
+      firstSwimFrame[pixel + 2] !== secondSwimFrame[pixel + 2]) {
+      changedTailPixels += 1;
+    }
+  }
+  if (changedTailPixels < 10) throw new Error("The procedural tail rig did not animate between swim frames.");
   const reel = new ReelController();
   if (Math.abs(reel.pressureSensorRPM - 57.5) > 0.01 ||
     REEL_ESCAPE_REVOLUTIONS !== 2) {
@@ -224,7 +244,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: rigged fish GLB, rolling 90-degree RPM average, smooth quarter-zone pressure gauge, two-revolution escape rule, weighted catch, and reset.";
+  result.textContent = "PASS: textured fish GLB, procedural tail rig, rolling 90-degree RPM average, smooth quarter-zone pressure gauge, two-revolution escape rule, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;

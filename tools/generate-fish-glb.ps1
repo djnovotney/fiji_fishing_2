@@ -26,7 +26,7 @@ $writer.Write([uint32]0x004E4942)
 $writer.Write($binary)
 $writer.Flush()
 
-$output = Join-Path (Split-Path $PSScriptRoot -Parent) "assets\fiji-trevally.glb"
+$output = Join-Path (Split-Path $PSScriptRoot -Parent) "assets\fiji-trevally-procedural-preview.glb"
 [IO.File]::WriteAllBytes($output, $stream.ToArray())
 $writer.Dispose()
 $stream.Dispose()

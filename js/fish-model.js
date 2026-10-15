@@ -1,90 +1,174 @@
-const FLOAT_BYTES = 4;
-const UNSIGNED_SHORT_BYTES = 2;
+const VERTEX_SHADER = `
+  attribute vec3 aPosition;
+  attribute vec3 aNormal;
+  attribute vec2 aTexCoord;
+  uniform float uPhase;
+  uniform float uDirection;
+  varying vec2 vTexCoord;
+  varying vec3 vNormal;
 
-function identityMatrix() {
-  return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-}
+  void main() {
+    float tailWeight = 1.0 - smoothstep(-0.72, -0.25, aPosition.y);
+    float tailSway = sin(uPhase * 3.2) * 0.18 * tailWeight * tailWeight;
+    vec3 position = aPosition;
+    position.x += tailSway;
+    gl_Position = vec4(position.y * uDirection * 0.95, position.x * 1.9, -position.z * 0.08, 1.0);
+    vTexCoord = aTexCoord;
+    vNormal = aNormal;
+  }
+`;
 
-function multiplyMatrices(a, b) {
-  const result = new Array(16).fill(0);
-  for (let column = 0; column < 4; column += 1) {
-    for (let row = 0; row < 4; row += 1) {
-      for (let index = 0; index < 4; index += 1) {
-        result[column * 4 + row] += a[index * 4 + row] * b[column * 4 + index];
-      }
+const FRAGMENT_SHADER = `
+  precision mediump float;
+  uniform sampler2D uTexture;
+  varying vec2 vTexCoord;
+  varying vec3 vNormal;
+
+  void main() {
+    vec4 color = texture2D(uTexture, vTexCoord);
+    if (color.a < 0.05) discard;
+    vec3 lightDirection = normalize(vec3(-0.33, 0.48, 0.81));
+    float lighting = 0.55 + max(dot(normalize(vNormal), lightDirection), 0.0) * 0.5;
+    gl_FragColor = vec4(color.rgb * lighting, color.a);
+  }
+`;
+
+function readAccessor(document, binary, accessorIndex) {
+  const accessor = document.accessors[accessorIndex];
+  const bufferView = document.bufferViews[accessor.bufferView];
+  const components = accessor.type === "SCALAR" ? 1 : Number(accessor.type.slice(-1));
+  const componentBytes = accessor.componentType === 5126 || accessor.componentType === 5125
+    ? 4
+    : accessor.componentType === 5123
+      ? 2
+      : 1;
+  const stride = bufferView.byteStride || components * componentBytes;
+  const start = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+  const data = new DataView(binary);
+  const values = new Float32Array(accessor.count * components);
+
+  for (let item = 0; item < accessor.count; item += 1) {
+    for (let component = 0; component < components; component += 1) {
+      const offset = start + item * stride + component * componentBytes;
+      let value;
+      if (accessor.componentType === 5126) value = data.getFloat32(offset, true);
+      else if (accessor.componentType === 5125) value = data.getUint32(offset, true);
+      else if (accessor.componentType === 5123) value = data.getUint16(offset, true);
+      else value = data.getUint8(offset);
+      values[item * components + component] = accessor.normalized
+        ? value / (accessor.componentType === 5121 ? 255 : 65535)
+        : value;
     }
   }
-  return result;
+  return values;
 }
 
-function translationMatrix([x, y, z]) {
-  const matrix = identityMatrix();
-  matrix[12] = x;
-  matrix[13] = y;
-  matrix[14] = z;
-  return matrix;
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const message = gl.getShaderInfoLog(shader);
+    gl.deleteShader(shader);
+    throw new Error(`Fish shader compilation failed: ${message}`);
+  }
+  return shader;
 }
 
-function rotationMatrix([x, y, z, w]) {
-  const xx = x * x, yy = y * y, zz = z * z;
-  const xy = x * y, xz = x * z, yz = y * z;
-  const wx = w * x, wy = w * y, wz = w * z;
-  return [
-    1 - 2 * (yy + zz), 2 * (xy + wz), 2 * (xz - wy), 0,
-    2 * (xy - wz), 1 - 2 * (xx + zz), 2 * (yz + wx), 0,
-    2 * (xz + wy), 2 * (yz - wx), 1 - 2 * (xx + yy), 0,
-    0, 0, 0, 1,
-  ];
+function createProgram(gl) {
+  const vertex = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+  const fragment = compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+  const program = gl.createProgram();
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  gl.deleteShader(vertex);
+  gl.deleteShader(fragment);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    throw new Error(`Fish shader link failed: ${gl.getProgramInfoLog(program)}`);
+  }
+  return program;
 }
 
-function scaleMatrix([x, y, z]) {
-  return [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1];
-}
-
-function transformPoint(matrix, point) {
-  const [x, y, z] = point;
-  return [
-    matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
-    matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
-    matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14],
-  ];
-}
-
-function dot(a, b) {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+function createBuffer(gl, target, data) {
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(target, buffer);
+  gl.bufferData(target, data, gl.STATIC_DRAW);
+  return buffer;
 }
 
 export class FishModel {
-  constructor(document, binary) {
-    this.document = document;
-    this.binary = binary;
-    this.accessorCache = new Map();
-    this.nodesByMesh = new Map();
-    this.parents = new Map();
-    this.sprites = new Map();
-    for (let index = 0; index < document.nodes.length; index += 1) {
-      const node = document.nodes[index];
-      if (node.mesh !== undefined) this.nodesByMesh.set(node.mesh, index);
-      for (const child of node.children || []) this.parents.set(child, index);
+  constructor(documentData, binary, textureImage) {
+    this.document = documentData;
+    this.textureImage = textureImage;
+    this.hasProceduralTailRig = true;
+    this.canvas = globalThis.document.createElement("canvas");
+    this.canvas.width = 128;
+    this.canvas.height = 64;
+    this.gl = this.canvas.getContext("webgl", {
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: true,
+    });
+    if (!this.gl) throw new Error("WebGL is unavailable for rendering the textured fish model.");
+
+    const gl = this.gl;
+    this.program = createProgram(gl);
+    this.locations = {
+      position: gl.getAttribLocation(this.program, "aPosition"),
+      normal: gl.getAttribLocation(this.program, "aNormal"),
+      texCoord: gl.getAttribLocation(this.program, "aTexCoord"),
+      phase: gl.getUniformLocation(this.program, "uPhase"),
+      direction: gl.getUniformLocation(this.program, "uDirection"),
+      texture: gl.getUniformLocation(this.program, "uTexture"),
+    };
+    this.parts = [];
+
+    for (const mesh of documentData.meshes) {
+      for (const primitive of mesh.primitives) {
+        if (primitive.attributes.TEXCOORD_0 === undefined || primitive.indices === undefined) {
+          throw new Error("Fish model must include indexed geometry and texture coordinates.");
+        }
+        const positions = readAccessor(documentData, binary, primitive.attributes.POSITION);
+        const normals = readAccessor(documentData, binary, primitive.attributes.NORMAL);
+        const texCoords = readAccessor(documentData, binary, primitive.attributes.TEXCOORD_0);
+        const indices = readAccessor(documentData, binary, primitive.indices);
+        if (positions.length / 3 > 65535) {
+          throw new Error("Fish model has too many vertices for the lightweight renderer.");
+        }
+        const indexData = new Uint16Array(indices.length);
+        for (let index = 0; index < indices.length; index += 1) {
+          if (indices[index] >= positions.length / 3) {
+            throw new Error("Fish model contains an index outside its vertex data.");
+          }
+          indexData[index] = indices[index];
+        }
+        this.parts.push({
+          position: createBuffer(gl, gl.ARRAY_BUFFER, positions),
+          normal: createBuffer(gl, gl.ARRAY_BUFFER, normals),
+          texCoord: createBuffer(gl, gl.ARRAY_BUFFER, texCoords),
+          indices: createBuffer(gl, gl.ELEMENT_ARRAY_BUFFER, indexData),
+          indexCount: indexData.length,
+        });
+      }
     }
-    this.primitives = document.meshes.map((mesh) => mesh.primitives.map((primitive) => ({
-      positions: this.accessor(primitive.attributes.POSITION),
-      normals: this.accessor(primitive.attributes.NORMAL),
-      colors: this.accessor(primitive.attributes.COLOR_0),
-      joints: primitive.attributes.JOINTS_0 === undefined
-        ? null
-        : this.accessor(primitive.attributes.JOINTS_0),
-      weights: primitive.attributes.WEIGHTS_0 === undefined
-        ? null
-        : this.accessor(primitive.attributes.WEIGHTS_0),
-      indices: this.accessor(primitive.indices),
-      material: primitive.material,
-    })));
-    const skin = document.skins && document.skins[0];
-    this.skin = skin ? {
-      joints: skin.joints,
-      inverseBindMatrices: this.accessor(skin.inverseBindMatrices),
-    } : null;
+
+    this.texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textureImage);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.CULL_FACE);
+    gl.useProgram(this.program);
+    gl.uniform1i(this.locations.texture, 0);
   }
 
   static async load(url) {
@@ -92,172 +176,79 @@ export class FishModel {
     if (!response.ok) throw new Error(`Fish model request failed (${response.status})`);
     const buffer = await response.arrayBuffer();
     const view = new DataView(buffer);
-    if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2) {
+    if (buffer.byteLength < 12 ||
+      view.getUint32(0, true) !== 0x46546c67 ||
+      view.getUint32(4, true) !== 2) {
       throw new Error("Fish model is not a valid glTF 2.0 binary file.");
     }
+
     let offset = 12;
-    let document = null;
+    let documentData = null;
     let binary = null;
     while (offset < buffer.byteLength) {
+      if (offset + 8 > buffer.byteLength) throw new Error("Fish model contains a truncated chunk.");
       const length = view.getUint32(offset, true);
       const type = view.getUint32(offset + 4, true);
       offset += 8;
+      if (offset + length > buffer.byteLength) throw new Error("Fish model contains an invalid chunk length.");
       if (type === 0x4e4f534a) {
-        document = JSON.parse(new TextDecoder().decode(buffer.slice(offset, offset + length)).trim());
+        documentData = JSON.parse(
+          new TextDecoder().decode(buffer.slice(offset, offset + length)).trim(),
+        );
       } else if (type === 0x004e4942) {
         binary = buffer.slice(offset, offset + length);
       }
       offset += length;
     }
-    if (!document || !binary) throw new Error("Fish model is missing its glTF JSON or geometry data.");
-    return new FishModel(document, binary);
-  }
-
-  accessor(index) {
-    if (this.accessorCache.has(index)) return this.accessorCache.get(index);
-    const accessor = this.document.accessors[index];
-    const view = this.document.bufferViews[accessor.bufferView];
-    const componentBytes = accessor.componentType === 5126
-      ? FLOAT_BYTES
-      : accessor.componentType === 5123
-        ? UNSIGNED_SHORT_BYTES
-        : 1;
-    const componentCount = accessor.type === "SCALAR"
-      ? 1
-      : accessor.type === "VEC2"
-        ? 2
-        : accessor.type === "VEC3"
-          ? 3
-          : accessor.type === "VEC4"
-            ? 4
-            : 16;
-    const stride = view.byteStride || componentBytes * componentCount;
-    const start = (view.byteOffset || 0) + (accessor.byteOffset || 0);
-    const data = new DataView(this.binary);
-    const values = new Array(accessor.count);
-    for (let item = 0; item < accessor.count; item += 1) {
-      values[item] = new Array(componentCount);
-      for (let component = 0; component < componentCount; component += 1) {
-        const offset = start + item * stride + component * componentBytes;
-        if (accessor.componentType === 5126) values[item][component] = data.getFloat32(offset, true);
-        else if (accessor.componentType === 5123) values[item][component] = data.getUint16(offset, true);
-        else values[item][component] = data.getUint8(offset);
-      }
+    if (!documentData || !binary) {
+      throw new Error("Fish model is missing its glTF JSON or geometry data.");
     }
-    this.accessorCache.set(index, values);
-    return values;
-  }
 
-  nodeMatrix(nodeIndex, tailSwing) {
-    const node = this.document.nodes[nodeIndex];
-    let local;
-    if (node.matrix) {
-      local = node.matrix;
-    } else {
-      const translation = node.translation || [0, 0, 0];
-      let rotation = node.rotation || [0, 0, 0, 1];
-      if (node.name === "Tail hinge joint") {
-        const halfAngle = tailSwing / 2;
-        rotation = [0, 0, Math.sin(halfAngle), Math.cos(halfAngle)];
-      }
-      local = multiplyMatrices(
-        translationMatrix(translation),
-        multiplyMatrices(rotationMatrix(rotation), scaleMatrix(node.scale || [1, 1, 1])),
-      );
+    const image = documentData.images && documentData.images[0];
+    if (!image || image.bufferView === undefined || !image.mimeType) {
+      throw new Error("Fish model is missing its embedded base-color texture.");
     }
-    const parent = this.parents.get(nodeIndex);
-    return parent === undefined
-      ? local
-      : multiplyMatrices(this.nodeMatrix(parent, tailSwing), local);
-  }
-
-  skinnedPoint(primitive, vertexIndex, meshNodeIndex, nodeMatrices) {
-    const position = primitive.positions[vertexIndex];
-    if (!primitive.joints || !primitive.weights || !this.skin) {
-      return transformPoint(nodeMatrices[meshNodeIndex], position);
-    }
-    const point = [0, 0, 0];
-    const meshInverse = nodeMatrices[meshNodeIndex];
-    for (let influence = 0; influence < 4; influence += 1) {
-      const weight = primitive.weights[vertexIndex][influence];
-      if (weight === 0) continue;
-      const joint = this.skin.joints[primitive.joints[vertexIndex][influence]];
-      const inverseBind = this.skin.inverseBindMatrices[joint === this.skin.joints[0] ? 0 : 1];
-      const skinMatrix = multiplyMatrices(nodeMatrices[joint], this.matrixFromFlat(inverseBind));
-      const skinned = transformPoint(skinMatrix, position);
-      point[0] += skinned[0] * weight;
-      point[1] += skinned[1] * weight;
-      point[2] += skinned[2] * weight;
-    }
-    return transformPoint(meshInverse, point);
-  }
-
-  matrixFromFlat(values) {
-    return values;
-  }
-
-  buildSprite(tailSwing) {
-    const nodeMatrices = this.document.nodes.map((_, index) => this.nodeMatrix(index, tailSwing));
-    const triangles = [];
-    for (const [meshIndex, nodeIndex] of this.nodesByMesh) {
-      const node = this.document.nodes[nodeIndex];
-      for (const primitive of this.primitives[meshIndex]) {
-        for (let i = 0; i < primitive.indices.length; i += 3) {
-          const indices = primitive.indices.slice(i, i + 3);
-          const points = indices.map((index) => this.skinnedPoint(primitive, index, nodeIndex, nodeMatrices));
-          const colors = indices.map((index) => primitive.colors[index]);
-          const normals = indices.map((index) => primitive.normals[index]);
-          triangles.push({
-            points,
-            colors,
-            normals,
-            z: (points[0][2] + points[1][2] + points[2][2]) / 3,
-            nodeName: node.name,
-          });
-        }
-      }
-    }
-    triangles.sort((a, b) => a.z - b.z);
-
-    const sprite = document.createElement("canvas");
-    sprite.width = 112;
-    sprite.height = 56;
-    const ctx = sprite.getContext("2d");
-    const scale = 30;
-    const light = [-0.33, 0.48, 0.81];
-    ctx.save();
-    ctx.translate(sprite.width / 2, sprite.height / 2);
-    ctx.scale(scale, -scale);
-    for (const triangle of triangles) {
-      const nx = (triangle.normals[0][0] + triangle.normals[1][0] + triangle.normals[2][0]) / 3;
-      const ny = (triangle.normals[0][1] + triangle.normals[1][1] + triangle.normals[2][1]) / 3;
-      const nz = (triangle.normals[0][2] + triangle.normals[1][2] + triangle.normals[2][2]) / 3;
-      const lightLevel = 0.48 + Math.max(0, dot([nx, ny, nz], light)) * 0.56;
-      const color = [0, 1, 2].map((channel) => {
-        const vertexColor = triangle.colors.reduce((sum, value) => sum + value[channel], 0) / 3;
-        return Math.round(Math.max(0, Math.min(255, vertexColor * lightLevel * 255)));
-      });
-      ctx.fillStyle = `rgb(${color[0]} ${color[1]} ${color[2]})`;
-      ctx.beginPath();
-      ctx.moveTo(triangle.points[0][0], triangle.points[0][1]);
-      ctx.lineTo(triangle.points[1][0], triangle.points[1][1]);
-      ctx.lineTo(triangle.points[2][0], triangle.points[2][1]);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.restore();
-    return sprite;
+    const imageView = documentData.bufferViews[image.bufferView];
+    const imageBytes = binary.slice(
+      imageView.byteOffset || 0,
+      (imageView.byteOffset || 0) + imageView.byteLength,
+    );
+    const textureImage = await createImageBitmap(new Blob([imageBytes], { type: image.mimeType }));
+    return new FishModel(documentData, binary, textureImage);
   }
 
   draw(ctx, fish) {
-    const swimFrame = Math.round((Math.sin(fish.phase * 3.2) + 1) * 4);
-    if (!this.sprites.has(swimFrame)) {
-      this.sprites.set(swimFrame, this.buildSprite((swimFrame / 4 - 1) * 0.17));
+    const gl = this.gl;
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(this.program);
+    gl.uniform1f(this.locations.phase, fish.phase);
+    gl.uniform1f(this.locations.direction, fish.direction);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+    for (const part of this.parts) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, part.position);
+      gl.enableVertexAttribArray(this.locations.position);
+      gl.vertexAttribPointer(this.locations.position, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, part.normal);
+      gl.enableVertexAttribArray(this.locations.normal);
+      gl.vertexAttribPointer(this.locations.normal, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, part.texCoord);
+      gl.enableVertexAttribArray(this.locations.texCoord);
+      gl.vertexAttribPointer(this.locations.texCoord, 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, part.indices);
+      gl.drawElements(gl.TRIANGLES, part.indexCount, gl.UNSIGNED_SHORT, 0);
     }
-    ctx.save();
-    ctx.translate(fish.x, fish.y + Math.sin(fish.phase) * 1.7);
-    ctx.scale(fish.direction * fish.size, fish.size);
-    ctx.drawImage(this.sprites.get(swimFrame), -56, -28, 112, 56);
-    ctx.restore();
+
+    const size = fish.size;
+    ctx.drawImage(
+      this.canvas,
+      fish.x - 56 * size,
+      fish.y + Math.sin(fish.phase) * 1.7 - 28 * size,
+      112 * size,
+      56 * size,
+    );
   }
 }
