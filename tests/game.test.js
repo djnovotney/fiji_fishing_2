@@ -4,11 +4,12 @@ import { Game } from "../js/game.js";
 import {
   REEL,
   REEL_ESCAPE_MAX_RPM,
-  REEL_ESCAPE_GRACE_SECONDS,
+  REEL_ESCAPE_REVOLUTIONS,
   REEL_ESCAPE_MIN_RPM,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
   REEL_SAMPLE_ANGLE,
+  pressureGaugePosition,
   REEL_TARGET_RPM,
   reelSpeedZone,
 } from "../js/constants.js";
@@ -118,9 +119,14 @@ test("the reel target, warning zones, and escape limits match the requested RPM 
   assert.equal(REEL_TARGET_RPM, 57.5);
   assert.equal(REEL_MAX_RPM, 65);
   assert.equal(REEL_ESCAPE_MIN_RPM, 40);
-  assert.equal(REEL_ESCAPE_MAX_RPM, 75);
-  assert.equal(REEL_ESCAPE_GRACE_SECONDS, 2);
+  assert.equal(REEL_ESCAPE_MAX_RPM, 85);
+  assert.equal(REEL_ESCAPE_REVOLUTIONS, 2);
   assert.equal(REEL_SAMPLE_ANGLE, Math.PI / 2);
+  assert.equal(pressureGaugePosition(0), 0);
+  assert.equal(pressureGaugePosition(50), 0.25);
+  assert.equal(pressureGaugePosition(57.5), 0.5);
+  assert.equal(pressureGaugePosition(65), 0.75);
+  assert.equal(pressureGaugePosition(90), 1);
   assert.equal(reelSpeedZone(49.9), "TOO LOW");
   assert.equal(reelSpeedZone(50), "IDEAL");
   assert.equal(reelSpeedZone(REEL_TARGET_RPM), "IDEAL");
@@ -220,18 +226,18 @@ test("reel speed averages uneven pointer samples and refreshes the gauge on each
   assert.ok(Math.abs(reel.pressureSensorRPM - 50) < 0.1);
 });
 
-test("escape limits allow a brief excursion and only lose the fish after two seconds outside limits", () => {
-  for (const [rpm, expectedEscape] of [[39, true], [40, false], [75, false], [76, true]]) {
+test("the fish escapes after two consecutive out-of-range revolutions", () => {
+  for (const [rpm, expectedEscape] of [[39, true], [40, false], [85, false], [86, true]]) {
     const game = new Game();
     game.start();
     game.state = "REELING";
     game.targetFish = game.fish[0];
     game.lineLength = 8;
-    reelForSegmentSpeeds(game.reel, [rpm, rpm, rpm], 1000);
+    reelForSegmentSpeeds(game.reel, Array(4).fill(rpm), 1000);
     game.update(0.01);
-    assert.equal(game.state, "REELING", "a brief excursion must not immediately lose the fish");
-    const segmentCount = Math.ceil(REEL_ESCAPE_GRACE_SECONDS * rpm * 24 / 60) + 4;
-    reelForSegmentSpeeds(game.reel, Array(segmentCount).fill(rpm), game.reel.lastInputAt);
+    assert.equal(game.state, "REELING", "one bad revolution only warns the player");
+    assert.equal(game.reel.escapeRevolutionStreak, 1);
+    reelForSegmentSpeeds(game.reel, Array(4).fill(rpm), game.reel.lastInputAt);
     game.update(0.01);
     assert.equal(game.state === "ESCAPED", expectedEscape, `${rpm} RPM escape behavior`);
   }
@@ -241,16 +247,17 @@ test("escape limits allow a brief excursion and only lose the fish after two sec
   game.state = "REELING";
   game.targetFish = game.fish[0];
   game.lineLength = 8;
-  reelForSegmentSpeeds(game.reel, [39, 39, 39], 1000);
+  reelForSegmentSpeeds(game.reel, Array(4).fill(39), 1000);
   game.update(0.01);
-  assert.ok(game.reel.escapeDuration < REEL_ESCAPE_GRACE_SECONDS);
-  reelForSegmentSpeeds(game.reel, [60, 60, 60], game.reel.lastInputAt);
+  assert.equal(game.reel.escapeRevolutionStreak, 1);
+  reelForSegmentSpeeds(game.reel, Array(4).fill(60), game.reel.lastInputAt);
   game.update(0.01);
-  assert.equal(game.reel.escapeDuration, 0, "a return inside the escape range clears the timer");
+  assert.equal(game.reel.escapeRevolutionStreak, 0, "a good revolution clears the escape streak");
 
   const reel = new ReelController();
-  reelForSegmentSpeeds(reel, Array(36).fill(39));
+  assert.equal(reel.pressureSensorRPM, 57.5, "the gauge starts in the center of the green zone");
+  reelForSegmentSpeeds(reel, Array(8).fill(39));
   const lowReadings = reel.consumeCompletedReadings();
-  assert.ok(lowReadings[0].escapeDuration < REEL_ESCAPE_GRACE_SECONDS);
+  assert.ok(lowReadings.some((reading) => reading.escapeRevolutionStreak === 1));
   assert.ok(lowReadings.some((reading) => reading.escaped));
 });

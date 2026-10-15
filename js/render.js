@@ -2,9 +2,8 @@ import {
   BUCKET,
   PLATFORM_HEIGHT,
   REEL,
-  REEL_MAX_RPM,
-  REEL_MIN_RPM,
   REEL_SENSOR_MAX_RPM,
+  pressureGaugePosition,
   ROD_TIP,
   TANK,
   WORLD,
@@ -382,7 +381,7 @@ function drawLineAndLure(ctx, game) {
   }
 }
 
-function drawPressureMeter(ctx, game) {
+function drawPressureMeter(ctx, game, meterProgress) {
   const x = 933;
   const y = 418;
   const width = 18;
@@ -392,9 +391,9 @@ function drawPressureMeter(ctx, game) {
   roundedRect(ctx, 923, y - 26, 75, height + 52, 9);
   ctx.fill();
 
-  const lowHeight = height * REEL_MIN_RPM / REEL_SENSOR_MAX_RPM;
-  const idealHeight = height * (REEL_MAX_RPM - REEL_MIN_RPM) / REEL_SENSOR_MAX_RPM;
-  const fastHeight = height * (REEL_SENSOR_MAX_RPM - REEL_MAX_RPM) / REEL_SENSOR_MAX_RPM;
+  const lowHeight = height * 0.25;
+  const idealHeight = height * 0.5;
+  const fastHeight = height * 0.25;
   ctx.fillStyle = "#ed765d";
   ctx.fillRect(x, y + height - lowHeight, width, lowHeight);
   ctx.fillStyle = "#64d995";
@@ -402,8 +401,6 @@ function drawPressureMeter(ctx, game) {
   ctx.fillStyle = "#ed765d";
   ctx.fillRect(x, y, width, fastHeight);
 
-  const sensorRPM = game.reel.pressureSensorRPM;
-  const meterProgress = Math.max(0, Math.min(1, sensorRPM / REEL_SENSOR_MAX_RPM));
   const markerY = y + height * (1 - meterProgress);
   const speedZone = game.reel.pressureSensorZone;
   ctx.fillStyle = speedZone === "IDEAL" ? "#64f09a" : "#ff6858";
@@ -420,16 +417,9 @@ function drawPressureMeter(ctx, game) {
   ctx.fillStyle = "#f4ffff";
   ctx.textAlign = "center";
   ctx.font = "bold 9px Trebuchet MS";
-  ctx.fillText("TOO FAST", 974, y + 11);
-  ctx.fillText("IDEAL", 974, y + fastHeight + idealHeight * 0.5 + 3);
-  ctx.fillText("TOO LOW", 974, y + height - 5);
-
-  ctx.fillStyle = speedZone === "IDEAL" ? "#64f09a" : "#ff8578";
-  ctx.font = "bold 9px Trebuchet MS";
-  const sensorLabel = speedZone === "IDEAL"
-    ? `REEL ${Math.round(sensorRPM)} RPM`
-    : `${speedZone} ${Math.round(sensorRPM)} RPM`;
-  ctx.fillText(sensorLabel, 960, y - 12);
+  ctx.fillText("TOO FAST", 974, y + fastHeight * 0.5 + 3);
+  ctx.fillText("REEL", 974, y + fastHeight + idealHeight * 0.5 + 3);
+  ctx.fillText("TOO LOW", 974, y + height - lowHeight * 0.5 + 3);
 }
 
 function drawReel(ctx, game) {
@@ -497,21 +487,6 @@ function drawReel(ctx, game) {
   ctx.strokeStyle = "#fff09a";
   ctx.lineWidth = 3;
   ctx.stroke();
-  ctx.fillStyle = "#f3ffff";
-  ctx.font = "bold 14px Trebuchet MS";
-  ctx.textAlign = "center";
-  ctx.fillText(`${Math.round(game.reel.pressureSensorRPM)} RPM`, x, y + outerRadius + 31);
-  if (game.state === "REELING") {
-    const speedZone = game.reel.pressureSensorZone;
-    const speedLabel = speedZone === "IDEAL"
-      ? `GREEN · ${REEL_MIN_RPM}–${REEL_MAX_RPM} RPM`
-      : speedZone;
-    ctx.fillStyle = speedZone === "IDEAL"
-      ? "#8ff0ad"
-      : "#ffd08b";
-    ctx.font = "bold 10px Trebuchet MS";
-    ctx.fillText(speedLabel, x, y + outerRadius + 45);
-  }
   ctx.textAlign = "left";
   if (game.state === "REELING" && !game.reel.dragging) {
     ctx.fillStyle = "rgba(255,255,255,0.86)";
@@ -528,6 +503,8 @@ export class GameRenderer {
     this.context = canvas.getContext("2d");
     this.fishModel = null;
     this.modelLoadError = null;
+    this.pressureMeterProgress = 0.5;
+    this.previousRenderElapsed = null;
     this.modelReady = FishModel.load(new URL("../assets/fiji-trevally.glb", import.meta.url))
       .then((model) => {
         this.fishModel = model;
@@ -542,13 +519,20 @@ export class GameRenderer {
 
   render(game) {
     const ctx = this.context;
+    const elapsedDelta = this.previousRenderElapsed === null
+      ? 0
+      : Math.max(0, game.elapsed - this.previousRenderElapsed);
+    const targetMeterProgress = pressureGaugePosition(game.reel.pressureSensorRPM);
+    this.pressureMeterProgress +=
+      (targetMeterProgress - this.pressureMeterProgress) * (1 - Math.exp(-elapsedDelta * 8));
+    this.previousRenderElapsed = game.elapsed;
     ctx.clearRect(0, 0, WORLD.width, WORLD.height);
     drawBackground(ctx);
     drawPlatformAndPig(ctx);
     drawBucket(ctx, game);
     drawAquarium(ctx, game, this.fishModel);
     drawLineAndLure(ctx, game);
-    if (game.state === "REELING") drawPressureMeter(ctx, game);
+    if (game.state === "REELING") drawPressureMeter(ctx, game, this.pressureMeterProgress);
     drawReel(ctx, game);
   }
 }

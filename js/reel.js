@@ -1,7 +1,7 @@
 import {
   REEL,
   REEL_ESCAPE_MAX_RPM,
-  REEL_ESCAPE_GRACE_SECONDS,
+  REEL_ESCAPE_REVOLUTIONS,
   REEL_ESCAPE_MIN_RPM,
   REEL_SAMPLE_ANGLE,
   REEL_SAMPLE_COUNT,
@@ -22,7 +22,7 @@ export class ReelController {
     this.angle = -Math.PI / 2;
     this.rpm = 0;
     this.segmentRPM = 0;
-    this.pressureSensorRPM = 0;
+    this.pressureSensorRPM = 57.5;
     this.angularVelocity = 0;
     this.cumulativeRotation = 0;
     this.pendingReelingRotation = 0;
@@ -33,9 +33,11 @@ export class ReelController {
     this.segmentStartedAt = null;
     this.segmentRPMSamples = [];
     this.completedReadings = [];
-    this.pressureSensorZone = "TOO LOW";
+    this.pressureSensorZone = "IDEAL";
+    this.revolutionDurationMs = 0;
+    this.revolutionSegmentCount = 0;
     this.escapeZone = null;
-    this.escapeDuration = 0;
+    this.escapeRevolutionStreak = 0;
   }
 
   pointerDown(x, y, now = performance.now()) {
@@ -100,6 +102,34 @@ export class ReelController {
       this.segmentRPMSamples.shift();
     }
 
+    this.revolutionDurationMs += segmentDurationMs;
+    this.revolutionSegmentCount += 1;
+    let escaped = false;
+    let revolutionRPM = null;
+    let escapeZone = null;
+    if (this.revolutionSegmentCount >= (Math.PI * 2) / REEL_SAMPLE_ANGLE) {
+      revolutionRPM = this.revolutionDurationMs > 0
+        ? 60_000 / this.revolutionDurationMs
+        : REEL_ESCAPE_MAX_RPM * 2;
+      escapeZone = revolutionRPM < REEL_ESCAPE_MIN_RPM - RPM_THRESHOLD_EPSILON
+        ? "TOO LOW"
+        : revolutionRPM > REEL_ESCAPE_MAX_RPM + RPM_THRESHOLD_EPSILON
+          ? "TOO FAST"
+          : null;
+      if (escapeZone) {
+        this.escapeRevolutionStreak = escapeZone === this.escapeZone
+          ? this.escapeRevolutionStreak + 1
+          : 1;
+        this.escapeZone = escapeZone;
+      } else {
+        this.escapeZone = null;
+        this.escapeRevolutionStreak = 0;
+      }
+      escaped = this.escapeRevolutionStreak >= REEL_ESCAPE_REVOLUTIONS;
+      this.revolutionDurationMs = 0;
+      this.revolutionSegmentCount = 0;
+    }
+
     if (this.segmentRPMSamples.length < REEL_SAMPLE_COUNT) return;
     const averageRPM = this.segmentRPMSamples.reduce((sum, sample) => sum + sample, 0) /
       REEL_SAMPLE_COUNT;
@@ -107,28 +137,15 @@ export class ReelController {
     this.rpm = averageRPM;
     this.angularVelocity = averageRPM * TAU / 60;
     const zone = reelSpeedZone(averageRPM);
-    const outOfControlRPM = averageRPM < REEL_ESCAPE_MIN_RPM - RPM_THRESHOLD_EPSILON
-      ? "TOO LOW"
-      : averageRPM > REEL_ESCAPE_MAX_RPM + RPM_THRESHOLD_EPSILON
-        ? "TOO FAST"
-        : null;
-    if (outOfControlRPM) {
-      this.escapeDuration = outOfControlRPM === this.escapeZone
-        ? this.escapeDuration + segmentDurationMs / 1000
-        : segmentDurationMs / 1000;
-      this.escapeZone = outOfControlRPM;
-    } else {
-      this.escapeZone = null;
-      this.escapeDuration = 0;
-    }
     this.pressureSensorZone = zone;
     this.completedReadings.push({
       rpm: averageRPM,
       averageRPM,
       zone,
-      escaped: this.escapeDuration >= REEL_ESCAPE_GRACE_SECONDS,
-      escapeDuration: this.escapeDuration,
-      escapeZone: this.escapeZone,
+      revolutionRPM,
+      escaped,
+      escapeRevolutionStreak: this.escapeRevolutionStreak,
+      escapeZone,
     });
   }
 
@@ -150,17 +167,19 @@ export class ReelController {
     this.segmentProgress = 0;
     this.segmentStartedAt = null;
     this.segmentRPMSamples = [];
+    this.revolutionDurationMs = 0;
+    this.revolutionSegmentCount = 0;
   }
 
   reset() {
     this.pointerUp();
-    this.pressureSensorRPM = 0;
+    this.pressureSensorRPM = 57.5;
     this.cumulativeRotation = 0;
     this.pendingReelingRotation = 0;
     this.completedReadings = [];
-    this.pressureSensorZone = "TOO LOW";
+    this.pressureSensorZone = "IDEAL";
     this.escapeZone = null;
-    this.escapeDuration = 0;
+    this.escapeRevolutionStreak = 0;
     this.angle = -Math.PI / 2;
   }
 }

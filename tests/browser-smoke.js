@@ -2,12 +2,13 @@ import { Game } from "../js/game.js";
 import {
   REEL,
   REEL_ESCAPE_MAX_RPM,
-  REEL_ESCAPE_GRACE_SECONDS,
+  REEL_ESCAPE_REVOLUTIONS,
   REEL_ESCAPE_MIN_RPM,
   REEL_MAX_RPM,
   REEL_MIN_RPM,
   REEL_SAMPLE_ANGLE,
   REEL_TARGET_RPM,
+  pressureGaugePosition,
   reelSpeedZone,
 } from "../js/constants.js";
 import { ReelController } from "../js/reel.js";
@@ -70,6 +71,10 @@ try {
     throw new Error("The fish GLB is missing its articulated rig, animation, or segmented mesh parts.");
   }
   const reel = new ReelController();
+  if (Math.abs(reel.pressureSensorRPM - 57.5) > 0.01 ||
+    REEL_ESCAPE_REVOLUTIONS !== 2) {
+    throw new Error("The gauge should start centered and require two revolutions to escape.");
+  }
   let reelTime = simulateRotation(reel, REEL_TARGET_RPM, 1000);
   const readings = reel.consumeCompletedReadings();
   if (readings.length < 2 ||
@@ -95,6 +100,11 @@ try {
     reelSpeedZone(REEL_MAX_RPM + 1) !== "TOO FAST") {
     throw new Error("Pressure sensor zones do not align with reel speed thresholds.");
   }
+  if (pressureGaugePosition(50) !== 0.25 ||
+    pressureGaugePosition(57.5) !== 0.5 ||
+    pressureGaugePosition(65) !== 0.75) {
+    throw new Error("The pressure gauge does not allocate one-quarter red, one-half green, and one-quarter red.");
+  }
   for (const [speed, expectedEscape] of [
     [REEL_ESCAPE_MIN_RPM - 1, true],
     [REEL_ESCAPE_MIN_RPM, false],
@@ -107,7 +117,7 @@ try {
     escapeGame.targetFish = escapeGame.fish[0];
     escapeGame.lineLength = 8;
     reelTime = 1000;
-    for (let revolution = 0; revolution < 4 && escapeGame.state === "REELING"; revolution += 1) {
+    for (let revolution = 0; revolution < 2 && escapeGame.state === "REELING"; revolution += 1) {
       reelTime = simulateRotation(escapeGame.reel, speed, reelTime, (dt) => {
         escapeGame.update(dt);
         return escapeGame.state !== "REELING";
@@ -122,26 +132,30 @@ try {
   hysteresisGame.state = "REELING";
   hysteresisGame.targetFish = hysteresisGame.fish[0];
   hysteresisGame.lineLength = 8;
-  simulateSegmentSpeeds(hysteresisGame.reel, [39, 39, 39], 1000);
+  simulateSegmentSpeeds(hysteresisGame.reel, Array(4).fill(39), 1000);
   hysteresisGame.update(0.01);
-  if (hysteresisGame.state !== "REELING" ||
-    hysteresisGame.reel.escapeDuration >= REEL_ESCAPE_GRACE_SECONDS) {
-    throw new Error("A brief out-of-range reading should not lose the fish.");
+  if (hysteresisGame.state !== "REELING" || hysteresisGame.reel.escapeRevolutionStreak !== 1) {
+    throw new Error("One out-of-range revolution should warn without losing the fish.");
   }
-  simulateSegmentSpeeds(hysteresisGame.reel, [60, 60, 60], hysteresisGame.reel.lastInputAt);
+  simulateSegmentSpeeds(hysteresisGame.reel, Array(4).fill(60), hysteresisGame.reel.lastInputAt);
   hysteresisGame.update(0.01);
-  if (hysteresisGame.reel.escapeDuration !== 0) {
-    throw new Error("A return inside the escape RPM range should clear the escape timer.");
+  if (hysteresisGame.reel.escapeRevolutionStreak !== 0) {
+    throw new Error("A good revolution should clear the escape warning.");
   }
-  let escapeTime = hysteresisGame.reel.lastInputAt;
-  for (let revolution = 0; revolution < 3 && hysteresisGame.state === "REELING"; revolution += 1) {
-    escapeTime = simulateRotation(hysteresisGame.reel, REEL_ESCAPE_MIN_RPM - 1, escapeTime, (dt) => {
-      hysteresisGame.update(dt);
-      return hysteresisGame.state !== "REELING";
-    });
-  }
+  simulateSegmentSpeeds(hysteresisGame.reel, Array(8).fill(39), hysteresisGame.reel.lastInputAt);
+  hysteresisGame.update(0.01);
   if (hysteresisGame.state !== "ESCAPED") {
-    throw new Error("The fish should escape after two seconds below the RPM limit.");
+    throw new Error("The fish should escape after two full revolutions below the RPM limit.");
+  }
+  const gaugeGame = new Game();
+  gaugeGame.state = "REELING";
+  gaugeGame.elapsed = 0.016;
+  gaugeGame.reel.pressureSensorRPM = 90;
+  renderer.render(gaugeGame);
+  gaugeGame.elapsed += 0.016;
+  renderer.render(gaugeGame);
+  if (!(renderer.pressureMeterProgress > 0.5 && renderer.pressureMeterProgress < 1)) {
+    throw new Error("The pressure gauge pointer should smoothly slide from the centered start.");
   }
   const lineGame = new Game();
   lineGame.start();
@@ -210,7 +224,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: rigged fish GLB, rolling 90-degree RPM average, pressure zones, two-second escape grace, weighted catch, and reset.";
+  result.textContent = "PASS: rigged fish GLB, rolling 90-degree RPM average, smooth quarter-zone pressure gauge, two-revolution escape rule, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;

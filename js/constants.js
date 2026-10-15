@@ -24,12 +24,25 @@ export const REEL_MIN_RPM = 50;
 export const REEL_TARGET_RPM = 57.5;
 export const REEL_MAX_RPM = 65;
 export const REEL_ESCAPE_MIN_RPM = 40;
-export const REEL_ESCAPE_MAX_RPM = 75;
-export const REEL_ESCAPE_GRACE_SECONDS = 2;
+export const REEL_ESCAPE_MAX_RPM = 85;
+export const REEL_ESCAPE_REVOLUTIONS = 2;
 export const REEL_SENSOR_MAX_RPM = 90;
 export const REEL_SAMPLE_ANGLE = Math.PI / 2;
 export const REEL_SAMPLE_COUNT = 3;
 const RPM_THRESHOLD_EPSILON = 1e-6;
+
+export function pressureGaugePosition(rpm) {
+  if (rpm <= REEL_MIN_RPM) {
+    return 0.25 * Math.max(0, rpm / REEL_MIN_RPM);
+  }
+  if (rpm <= REEL_MAX_RPM) {
+    return 0.25 + 0.5 * (rpm - REEL_MIN_RPM) / (REEL_MAX_RPM - REEL_MIN_RPM);
+  }
+  return 0.75 + 0.25 * Math.min(
+    1,
+    (rpm - REEL_MAX_RPM) / (REEL_SENSOR_MAX_RPM - REEL_MAX_RPM),
+  );
+}
 
 export function reelSpeedZone(rpm) {
   if (rpm < REEL_MIN_RPM - RPM_THRESHOLD_EPSILON) return "TOO LOW";
