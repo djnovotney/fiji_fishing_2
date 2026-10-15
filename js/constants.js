@@ -20,15 +20,16 @@ export const LINE = Object.freeze({
   metersPerRevolution: 0.27,
 });
 
+export const GAME_DURATION_SECONDS = 4 * 60;
 export const REEL_MIN_RPM = 50;
 export const REEL_TARGET_RPM = 57.5;
 export const REEL_MAX_RPM = 65;
 export const REEL_ESCAPE_MIN_RPM = 40;
-export const REEL_ESCAPE_MAX_RPM = 85;
+export const REEL_ESCAPE_MAX_RPM = 110;
 export const REEL_ESCAPE_REVOLUTIONS = 2;
-export const REEL_SENSOR_MAX_RPM = 90;
+export const REEL_SENSOR_MAX_RPM = 110;
 export const REEL_SAMPLE_ANGLE = Math.PI / 2;
-export const REEL_SAMPLE_COUNT = 3;
+export const REEL_SAMPLE_COUNT = 2;
 const RPM_THRESHOLD_EPSILON = 1e-6;
 
 export function pressureGaugePosition(rpm) {

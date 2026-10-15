@@ -1,5 +1,6 @@
 import { Game } from "../js/game.js";
 import {
+  GAME_DURATION_SECONDS,
   REEL,
   REEL_ESCAPE_MAX_RPM,
   REEL_ESCAPE_REVOLUTIONS,
@@ -7,6 +8,7 @@ import {
   REEL_MAX_RPM,
   REEL_MIN_RPM,
   REEL_SAMPLE_ANGLE,
+  REEL_SAMPLE_COUNT,
   REEL_TARGET_RPM,
   pressureGaugePosition,
   reelSpeedZone,
@@ -86,10 +88,11 @@ try {
   const instructions = pageMarkup.slice(instructionsPosition);
   if (!instructions.includes("click to cast") ||
     !instructions.includes("click the Fish-On! circle") ||
+    !instructions.includes("4-minute timer") ||
     !instructions.includes("50–65 RPM") ||
     !instructions.includes("two complete revolutions") ||
     !instructions.includes("below <strong>40 RPM</strong>") ||
-    !instructions.includes("above <strong>85 RPM</strong>")) {
+    !instructions.includes("above <strong>110 RPM</strong>")) {
     throw new Error("The how-to-play copy should match casting, hooking, reeling, and escape rules.");
   }
 
@@ -98,6 +101,7 @@ try {
     <div id="start-panel"></div><button id="start-button"></button>
     <button id="bite-button"></button><div id="status-label"></div>
     <aside id="debug-panel"></aside><span id="score"></span><span id="fish-count"></span>
+    <span id="game-timer"></span>
   `;
   document.body.append(statusFixture);
   const statusGame = new Game();
@@ -112,6 +116,7 @@ try {
     LANDED: "Nice catch! Bringing it to the bucket...",
     ESCAPED: "The fish got away.",
     RESET: "Getting the line ready...",
+    TIME_UP: "Time's up! Final score.",
   };
   for (const [state, expectedText] of Object.entries(expectedStatuses)) {
     statusGame.state = state;
@@ -127,7 +132,43 @@ try {
   if (statusUI.status.textContent !== "Waiting for a fish to notice the lure...") {
     throw new Error("The cast-waiting status should tell the player what happens next.");
   }
+  if (statusFixture.querySelector("#game-timer").textContent !== "4:00") {
+    throw new Error("The countdown should start at four minutes.");
+  }
+  statusGame.timeRemainingSeconds = 65.2;
+  statusUI.render();
+  if (statusFixture.querySelector("#game-timer").textContent !== "1:06") {
+    throw new Error("The countdown should display remaining minutes and seconds.");
+  }
+  statusGame.timeRemainingSeconds = 0;
+  statusGame.state = "TIME_UP";
+  statusUI.render();
+  if (statusFixture.querySelector("#game-timer").textContent !== "0:00" ||
+    statusUI.status.textContent !== expectedStatuses.TIME_UP) {
+    throw new Error("The zeroed countdown should show the time-up message.");
+  }
   statusFixture.remove();
+
+  const timerGame = new Game();
+  if (timerGame.timeRemainingSeconds !== GAME_DURATION_SECONDS) {
+    throw new Error("The game timer did not initialize to four minutes.");
+  }
+  timerGame.start();
+  timerGame.update(0.05);
+  if (Math.abs(timerGame.timeRemainingSeconds - (GAME_DURATION_SECONDS - 0.05)) > 1e-9) {
+    throw new Error("The countdown should advance after fishing starts.");
+  }
+  timerGame.state = "REELING";
+  timerGame.targetFish = timerGame.fish[0];
+  timerGame.reel.dragging = true;
+  timerGame.timeRemainingSeconds = 0.05;
+  timerGame.update(0.05);
+  const timeUpElapsed = timerGame.elapsed;
+  timerGame.update(0.05);
+  if (timerGame.state !== "TIME_UP" || timerGame.reel.dragging ||
+    timerGame.timeRemainingSeconds !== 0 || timerGame.elapsed !== timeUpElapsed) {
+    throw new Error("The countdown should stop the fishing session and reel input at zero.");
+  }
 
   const game = new Game();
   const renderer = new GameRenderer(document.querySelector("#test-canvas"));
@@ -166,21 +207,26 @@ try {
   }
   let reelTime = simulateRotation(reel, REEL_TARGET_RPM, 1000);
   const readings = reel.consumeCompletedReadings();
-  if (readings.length < 2 ||
+  if (readings.length < 3 ||
     Math.abs(readings[readings.length - 1].rpm - REEL_TARGET_RPM) > 0.1 ||
     readings[readings.length - 1].zone !== "IDEAL") {
-    throw new Error("The pressure sensor did not average and update from the three 90-degree samples.");
+    throw new Error("The pressure sensor did not average and update from two 90-degree samples.");
+  }
+  if (REEL_SAMPLE_COUNT !== 2) {
+    throw new Error("The pressure sensor should respond using a rolling average of two 90-degree samples.");
   }
   const mixedReel = new ReelController();
   simulateSegmentSpeeds(mixedReel, [45, 60, 66, 100, 35], 1000);
   const mixedReadings = mixedReel.consumeCompletedReadings();
-  if (mixedReadings.length !== 3 ||
-    Math.abs(mixedReadings[0].rpm - 57) > 0.1 ||
-    Math.abs(mixedReadings[1].averageRPM - (60 + 66 + 100) / 3) > 0.1 ||
-    Math.abs(mixedReadings[1].rpm - (60 + 66 + 100) / 3) > 0.1 ||
-    Math.abs(mixedReadings[2].averageRPM - (66 + 100 + 35) / 3) > 0.1 ||
-    Math.abs(mixedReadings[2].rpm - (66 + 100 + 35) / 3) > 0.1) {
-    throw new Error("The pressure sensor did not directly display the rolling three-segment 90-degree average.");
+  if (mixedReadings.length !== 4 ||
+    Math.abs(mixedReadings[0].rpm - 52.5) > 0.1 ||
+    Math.abs(mixedReadings[1].averageRPM - 63) > 0.1 ||
+    Math.abs(mixedReadings[1].rpm - 63) > 0.1 ||
+    Math.abs(mixedReadings[2].averageRPM - 83) > 0.1 ||
+    Math.abs(mixedReadings[2].rpm - 83) > 0.1 ||
+    Math.abs(mixedReadings[3].averageRPM - 67.5) > 0.1 ||
+    Math.abs(mixedReadings[3].rpm - 67.5) > 0.1) {
+    throw new Error("The pressure sensor did not directly display the rolling two-segment 90-degree average.");
   }
   if (reelSpeedZone(REEL_MIN_RPM - 1) !== "TOO LOW" ||
     reelSpeedZone(REEL_MIN_RPM) !== "IDEAL" ||
@@ -197,6 +243,7 @@ try {
   for (const [speed, expectedEscape] of [
     [REEL_ESCAPE_MIN_RPM - 1, true],
     [REEL_ESCAPE_MIN_RPM, false],
+    [85, false],
     [REEL_ESCAPE_MAX_RPM, false],
     [REEL_ESCAPE_MAX_RPM + 1, true],
   ]) {
@@ -213,7 +260,7 @@ try {
       });
     }
     if ((escapeGame.state === "ESCAPED") !== expectedEscape) {
-      throw new Error(`${speed} RPM escape behavior did not match its threshold.`);
+      throw new Error(`${speed} RPM escape behavior did not match its 110 RPM threshold.`);
     }
   }
   const hysteresisGame = new Game();
@@ -246,7 +293,7 @@ try {
   const initialGaugeProgress = renderer.pressureMeterProgress;
   gaugeGame.elapsed += 0.1;
   renderer.render(gaugeGame);
-  if (!(initialGaugeProgress > 0.5 && initialGaugeProgress < 0.7 &&
+  if (!(initialGaugeProgress > 0.65 && initialGaugeProgress < 0.75 &&
     renderer.pressureMeterProgress > initialGaugeProgress &&
     renderer.pressureMeterProgress < 1)) {
     throw new Error("The pressure gauge pointer should smoothly ease toward its target without snapping.");
@@ -318,7 +365,7 @@ try {
     elapsed += 0.05;
   }
   if (game.state !== "IDLE" || game.targetFish !== null) throw new Error("Fishing attempt did not reset.");
-  result.textContent = "PASS: fish GLB, all state prompts and below-tank instructions, reel RPM average, pressure gauge, escape rule, weighted catch, and reset.";
+  result.textContent = "PASS: fish GLB, state prompts, two-segment RPM average, faster 110 RPM escape threshold, four-minute timer, pressure gauge, weighted catch, and reset.";
   document.body.dataset.result = "PASS";
 } catch (error) {
   result.textContent = `FAIL: ${error.stack || error.message}`;

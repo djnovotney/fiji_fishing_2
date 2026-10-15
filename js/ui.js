@@ -9,7 +9,15 @@ const STATUS_TEXT = {
   LANDED: "Nice catch! Bringing it to the bucket...",
   ESCAPED: "The fish got away.",
   RESET: "Getting the line ready...",
+  TIME_UP: "Time's up! Final score.",
 };
+
+function formatTime(secondsRemaining) {
+  const totalSeconds = Math.ceil(secondsRemaining);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
 
 export class GameUI {
   constructor(game) {
@@ -21,6 +29,7 @@ export class GameUI {
     this.debug = document.querySelector("#debug-panel");
     this.score = document.querySelector("#score");
     this.fishCount = document.querySelector("#fish-count");
+    this.timer = document.querySelector("#game-timer");
 
     this.startButton.addEventListener("click", () => game.start());
     this.biteButton.addEventListener("click", () => {
@@ -47,6 +56,7 @@ export class GameUI {
     this.status.textContent = game.started ? stateText : "";
     this.score.textContent = `${game.totalWeightLb.toFixed(1)} lb`;
     this.fishCount.textContent = String(game.fishCaught);
+    this.timer.textContent = formatTime(game.timeRemainingSeconds);
     this.debug.hidden = !game.debugEnabled;
     if (game.debugEnabled) {
       const fish = game.targetFish || game.landedFish;

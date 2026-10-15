@@ -1,4 +1,4 @@
-import { ROD_TIP, TANK } from "./constants.js";
+import { GAME_DURATION_SECONDS, ROD_TIP, TANK } from "./constants.js";
 import { createFishSchool, updateFish } from "./fish.js";
 import { hookFish, lineLengthForLure, updateFishing } from "./fishing.js";
 import { ReelController } from "./reel.js";
@@ -12,6 +12,7 @@ export class Game {
     this.state = "IDLE";
     this.stateTimer = 0;
     this.elapsed = 0;
+    this.timeRemainingSeconds = GAME_DURATION_SECONDS;
     this.totalWeightLb = 0;
     this.fishCaught = 0;
     this.fish = createFishSchool();
@@ -58,9 +59,16 @@ export class Game {
   }
 
   update(dt) {
-    if (!this.started) return;
+    if (!this.started || this.state === "TIME_UP") return;
     dt = Math.min(dt, 0.05);
     this.elapsed += dt;
+    this.timeRemainingSeconds = Math.max(0, this.timeRemainingSeconds - dt);
+    if (this.timeRemainingSeconds === 0) {
+      this.state = "TIME_UP";
+      this.stateTimer = 0;
+      this.reel.pointerUp();
+      return;
+    }
     const attractionState = this.state === "FISH_INTERESTED" || this.state === "BITE";
     const attractedFish = attractionState && this.targetFish ? this.targetFish : null;
     if (attractedFish) {

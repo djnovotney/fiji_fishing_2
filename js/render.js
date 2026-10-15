@@ -10,7 +10,7 @@ import {
 } from "./constants.js";
 import { FishModel } from "./fish-model.js";
 
-const PRESSURE_METER_SMOOTHING = 4;
+const PRESSURE_METER_SMOOTHING = 6;
 
 function roundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();

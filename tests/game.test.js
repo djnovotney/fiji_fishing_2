@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../js/game.js";
 import {
+  GAME_DURATION_SECONDS,
   REEL,
   REEL_ESCAPE_MAX_RPM,
   REEL_ESCAPE_REVOLUTIONS,
@@ -9,6 +10,7 @@ import {
   REEL_MAX_RPM,
   REEL_MIN_RPM,
   REEL_SAMPLE_ANGLE,
+  REEL_SAMPLE_COUNT,
   pressureGaugePosition,
   REEL_TARGET_RPM,
   reelSpeedZone,
@@ -119,14 +121,16 @@ test("the reel target, warning zones, and escape limits match the requested RPM 
   assert.equal(REEL_TARGET_RPM, 57.5);
   assert.equal(REEL_MAX_RPM, 65);
   assert.equal(REEL_ESCAPE_MIN_RPM, 40);
-  assert.equal(REEL_ESCAPE_MAX_RPM, 85);
+  assert.equal(REEL_ESCAPE_MAX_RPM, 110);
   assert.equal(REEL_ESCAPE_REVOLUTIONS, 2);
   assert.equal(REEL_SAMPLE_ANGLE, Math.PI / 2);
+  assert.equal(REEL_SAMPLE_COUNT, 2);
   assert.equal(pressureGaugePosition(0), 0);
   assert.equal(pressureGaugePosition(50), 0.25);
   assert.equal(pressureGaugePosition(57.5), 0.5);
   assert.equal(pressureGaugePosition(65), 0.75);
-  assert.equal(pressureGaugePosition(90), 1);
+  assert.equal(pressureGaugePosition(110), 1);
+  assert.ok(pressureGaugePosition(90) < 1);
   assert.equal(reelSpeedZone(49.9), "TOO LOW");
   assert.equal(reelSpeedZone(50), "IDEAL");
   assert.equal(reelSpeedZone(REEL_TARGET_RPM), "IDEAL");
@@ -134,26 +138,26 @@ test("the reel target, warning zones, and escape limits match the requested RPM 
   assert.equal(reelSpeedZone(65.1), "TOO FAST");
 });
 
-test("reel input updates the gauge from a rolling average of three 90-degree segments", () => {
+test("reel input updates the gauge from a rolling average of two 90-degree segments", () => {
   const reel = new ReelController();
-  reelForSegmentSpeeds(reel, [45, 60]);
-  assert.equal(reel.consumeCompletedReadings().length, 0, "the average waits for three 90-degree segments");
-  reelForSegmentSpeeds(reel, [66], reel.lastInputAt);
+  reelForSegmentSpeeds(reel, [45]);
+  assert.equal(reel.consumeCompletedReadings().length, 0, "the average waits for two 90-degree segments");
+  reelForSegmentSpeeds(reel, [60], reel.lastInputAt);
   const [reading] = reel.consumeCompletedReadings();
-  assert.ok(Math.abs(reading.rpm - 57) < 0.1);
+  assert.ok(Math.abs(reading.rpm - 52.5) < 0.1);
   assert.equal(reading.zone, "IDEAL");
   assert.equal(reading.escaped, false);
-  assert.ok(Math.abs(reel.pressureSensorRPM - 57) < 0.1);
+  assert.ok(Math.abs(reel.pressureSensorRPM - 52.5) < 0.1);
   assert.ok(reel.cumulativeRotation > 0);
 
   reelForSegmentSpeeds(reel, [100, 35], reel.lastInputAt);
   const nextReadings = reel.consumeCompletedReadings();
   assert.equal(nextReadings.length, 2, "the sensor refreshes after each additional 90-degree segment");
-  const nextAverage = (60 + 66 + 100) / 3;
+  const nextAverage = (60 + 100) / 2;
   assert.ok(Math.abs(nextReadings[0].averageRPM - nextAverage) < 0.1);
   assert.ok(Math.abs(nextReadings[0].rpm - nextAverage) < 0.1);
   assert.equal(nextReadings[0].escaped, false);
-  const finalAverage = (66 + 100 + 35) / 3;
+  const finalAverage = (100 + 35) / 2;
   assert.ok(Math.abs(nextReadings[1].averageRPM - finalAverage) < 0.1);
   assert.ok(Math.abs(nextReadings[1].rpm - finalAverage) < 0.1);
   assert.equal(nextReadings[1].escaped, false);
@@ -227,7 +231,7 @@ test("reel speed averages uneven pointer samples and refreshes the gauge on each
 });
 
 test("the fish escapes after two consecutive out-of-range revolutions", () => {
-  for (const [rpm, expectedEscape] of [[39, true], [40, false], [85, false], [86, true]]) {
+  for (const [rpm, expectedEscape] of [[39, true], [40, false], [85, false], [110, false], [111, true]]) {
     const game = new Game();
     game.start();
     game.state = "REELING";
@@ -260,4 +264,33 @@ test("the fish escapes after two consecutive out-of-range revolutions", () => {
   const lowReadings = reel.consumeCompletedReadings();
   assert.ok(lowReadings.some((reading) => reading.escapeRevolutionStreak === 1));
   assert.ok(lowReadings.some((reading) => reading.escaped));
+});
+
+test("the four-minute countdown starts with the game and freezes gameplay at zero", () => {
+  const game = new Game();
+  assert.equal(game.timeRemainingSeconds, GAME_DURATION_SECONDS);
+  game.update(1);
+  assert.equal(game.timeRemainingSeconds, GAME_DURATION_SECONDS);
+
+  game.start();
+  assert.equal(game.timeRemainingSeconds, GAME_DURATION_SECONDS);
+  game.update(0.05);
+  assert.ok(Math.abs(game.timeRemainingSeconds - (GAME_DURATION_SECONDS - 0.05)) < 1e-9);
+  game.start();
+  assert.ok(Math.abs(game.timeRemainingSeconds - (GAME_DURATION_SECONDS - 0.05)) < 1e-9);
+
+  game.state = "REELING";
+  game.targetFish = game.fish[0];
+  game.reel.dragging = true;
+  game.timeRemainingSeconds = 0.05;
+  game.update(0.05);
+  assert.equal(game.timeRemainingSeconds, 0);
+  assert.equal(game.state, "TIME_UP");
+  assert.equal(game.reel.dragging, false);
+  assert.equal(game.castLure(500, 330), false);
+
+  const elapsedAtEnd = game.elapsed;
+  game.update(1);
+  assert.equal(game.elapsed, elapsedAtEnd);
+  assert.equal(game.state, "TIME_UP");
 });

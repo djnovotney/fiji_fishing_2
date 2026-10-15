@@ -16,7 +16,8 @@ Then open <http://localhost:8000>.
 
 - Select **Start fishing**, move the lure in front of a fish, and click to cast. The line settles at the selected spot; wait for the fish to approach and bite.
 - When the small **Fish-On! (click here)** circle appears at the reel's left edge, click it to set the hook.
-- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. The line reels only as the handle actually turns. Every 90° segment is measured, and the gauge smoothly follows the rolling average of the latest three segments. The gauge is divided into ¼ red (too low), ½ green (reel), and ¼ red (too fast); keep the reading in the green at **50–65 RPM**. The fish escapes after two complete revolutions below **40 RPM** or above **85 RPM**.
+- Catch as many fish as you can before the **4-minute countdown** ends the session.
+- During the fight, press the single yellow reel handle and keep the mouse button held while circling clockwise. The line reels only as the handle actually turns. Every 90° segment is measured, and the gauge responds to the rolling average of the latest two segments. The gauge is divided into ¼ red (too low), ½ green (reel), and ¼ red (too fast); keep the reading in the green at **50–65 RPM**. The gauge warns above 65 RPM, and the fish escapes after two complete revolutions below **40 RPM** or above **110 RPM**.
 - State-specific prompts and the full control instructions appear below the fish tank.
 - Aquarium fish use the supplied `assets/fiji-trevally.glb`, including its embedded blue-trevally UV texture. The source mesh has no bone skin or animation tracks, so the renderer adds a lightweight procedural tail rig and animates it as each fish swims. Fish size varies per fish and scales the model in-game. The local WebGL renderer reads the GLB directly, so no 3D CDN or backend is required.
 - The scoreboard totals catch weight; each fish weighs between **3 and 10 lb**.
@@ -28,7 +29,7 @@ Publish the repository root as a static site. HTML, CSS, and module URLs are rel
 
 ## Smoke test
 
-With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop, load the GLB model, rolling three-segment RPM measurement, gauge movement, pressure zones, and two-revolution escape rule. If Node.js is available, `npm test` runs the gameplay and reel-control checks.
+With the local HTTP server running, open <http://localhost:8000/tests/browser-smoke.html> to exercise and render the complete lure-to-catch-to-reset loop, load the GLB model, rolling two-segment RPM measurement, gauge movement, pressure zones, timed session, and two-revolution escape rule. If Node.js is available, `npm test` runs the gameplay and reel-control checks.
 
 ## Structure
 
