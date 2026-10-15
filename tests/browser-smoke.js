@@ -60,6 +60,23 @@ function simulateSegmentSpeeds(reel, speeds, startTime) {
 }
 
 try {
+  const pageResponse = await fetch(new URL("../index.html", import.meta.url));
+  if (!pageResponse.ok) throw new Error("The game page could not be loaded for layout checks.");
+  const pageMarkup = await pageResponse.text();
+  const tankPosition = pageMarkup.indexOf('class="game-frame"');
+  const instructionsPosition = pageMarkup.indexOf('class="game-instructions"');
+  if (tankPosition < 0 || instructionsPosition < tankPosition ||
+    pageMarkup.indexOf("Move the lure in front of a fish", 0) < instructionsPosition) {
+    throw new Error("The full game instructions should appear beneath the fish tank.");
+  }
+  const startPanel = pageMarkup.slice(
+    pageMarkup.indexOf('id="start-panel"'),
+    pageMarkup.indexOf("</div>", pageMarkup.indexOf('id="start-panel"')),
+  );
+  if (startPanel.includes("Move the lure")) {
+    throw new Error("The start panel should not contain the full gameplay instructions.");
+  }
+
   const game = new Game();
   const renderer = new GameRenderer(document.querySelector("#test-canvas"));
   await renderer.modelReady;
@@ -169,13 +186,18 @@ try {
   }
   const gaugeGame = new Game();
   gaugeGame.state = "REELING";
-  gaugeGame.elapsed = 0.016;
+  gaugeGame.elapsed = 0.1;
   gaugeGame.reel.pressureSensorRPM = 90;
+  renderer.previousRenderElapsed = 0;
+  renderer.pressureMeterProgress = 0.5;
   renderer.render(gaugeGame);
-  gaugeGame.elapsed += 0.016;
+  const initialGaugeProgress = renderer.pressureMeterProgress;
+  gaugeGame.elapsed += 0.1;
   renderer.render(gaugeGame);
-  if (!(renderer.pressureMeterProgress > 0.5 && renderer.pressureMeterProgress < 1)) {
-    throw new Error("The pressure gauge pointer should smoothly slide from the centered start.");
+  if (!(initialGaugeProgress > 0.5 && initialGaugeProgress < 0.7 &&
+    renderer.pressureMeterProgress > initialGaugeProgress &&
+    renderer.pressureMeterProgress < 1)) {
+    throw new Error("The pressure gauge pointer should smoothly ease toward its target without snapping.");
   }
   const lineGame = new Game();
   lineGame.start();

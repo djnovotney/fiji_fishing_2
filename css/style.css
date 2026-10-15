@@ -118,13 +118,6 @@ h1 {
   font-size: clamp(1.45rem, 3vw, 2rem);
 }
 
-.start-panel p:not(.eyebrow) {
-  margin: 0 0 18px;
-  color: #c3dce1;
-  font-size: 0.92rem;
-  line-height: 1.5;
-}
-
 .primary-button {
   padding: 11px 22px;
   border: 0;
@@ -222,15 +215,27 @@ h1 {
   pointer-events: none;
 }
 
-.help-hint {
-  position: absolute;
-  right: 2%;
-  bottom: 1.5%;
+.game-instructions {
+  margin-top: 14px;
+  padding: 16px 20px;
+  border: 1px solid rgba(153, 224, 230, 0.18);
+  border-radius: 12px;
+  background: rgba(7, 42, 56, 0.72);
+  color: #c3dce1;
+}
+
+.game-instructions h2 {
+  margin: 0 0 6px;
+  color: #8be3d4;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.game-instructions p {
   margin: 0;
-  color: rgba(235, 250, 250, 0.85);
-  font-size: clamp(0.57rem, 1.2vw, 0.75rem);
-  text-shadow: 0 1px 4px #062c39;
-  pointer-events: none;
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 kbd {
@@ -241,7 +246,7 @@ kbd {
 }
 
 .footer-note {
-  margin: 12px 3px 0;
+  margin: 10px 3px 0;
   color: #8faeb8;
   font-size: 0.76rem;
 }

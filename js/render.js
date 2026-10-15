@@ -10,6 +10,8 @@ import {
 } from "./constants.js";
 import { FishModel } from "./fish-model.js";
 
+const PRESSURE_METER_SMOOTHING = 4;
+
 function roundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, radius);
@@ -524,7 +526,8 @@ export class GameRenderer {
       : Math.max(0, game.elapsed - this.previousRenderElapsed);
     const targetMeterProgress = pressureGaugePosition(game.reel.pressureSensorRPM);
     this.pressureMeterProgress +=
-      (targetMeterProgress - this.pressureMeterProgress) * (1 - Math.exp(-elapsedDelta * 8));
+      (targetMeterProgress - this.pressureMeterProgress) *
+      (1 - Math.exp(-elapsedDelta * PRESSURE_METER_SMOOTHING));
     this.previousRenderElapsed = game.elapsed;
     ctx.clearRect(0, 0, WORLD.width, WORLD.height);
     drawBackground(ctx);
